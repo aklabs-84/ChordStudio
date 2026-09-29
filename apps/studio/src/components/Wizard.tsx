@@ -13,6 +13,8 @@ interface Props {
   playhead: Playhead | null;
   playing: boolean;
   onToggle: () => void;
+  /** 섹션 편집 단계에 들어오고 나갈 때 알려준다: 재생을 그 섹션 하나만 반복하도록 좁히기 위함 */
+  onSectionFocus: (sectionId: string | null) => void;
   onRegenerate: (opts: { genre: Genre; seed: number; key?: string; bpm?: number }) => void;
   onPatchMeta: (patch: Partial<Song["meta"]>) => void;
   onChange: (update: (song: Song) => Song) => void;
@@ -80,6 +82,7 @@ export function Wizard({
   playhead,
   playing,
   onToggle,
+  onSectionFocus,
   onRegenerate,
   onPatchMeta,
   onChange,
@@ -109,6 +112,13 @@ export function Wizard({
   const isFinal = clampedStep === totalSteps - 1;
   const sectionIndex = clampedStep - 2; // AI 추천/곡 기획/완성이 아닐 때만 유효
   const currentSection = !isAiStep && !isPlanStep && !isFinal ? sections[sectionIndex] : undefined;
+
+  // 섹션 편집 화면에 있는 동안은 재생을 그 섹션만 반복하도록 좁힌다. 다른 단계(완성 포함)로 나가면 다시 전체 곡을 재생한다.
+  useEffect(() => {
+    onSectionFocus(currentSection?.id ?? null);
+    return () => onSectionFocus(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSection?.id]);
 
   const mood = MOODS.find((m) => m.key === selectedMood);
   const prompt = buildPrompt(mood);

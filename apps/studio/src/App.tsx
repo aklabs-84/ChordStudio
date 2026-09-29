@@ -61,6 +61,8 @@ export function App() {
   const [samplesReady, setSamplesReady] = useState(false);
   // 되돌리기 한 단계: 직전 편집 전의 구조(섹션·재생 순서). BPM·믹서는 되돌리지 않는다
   const [undo, setUndo] = useState<Pick<Song, "sections" | "arrangement"> | null>(null);
+  // 위자드에서 특정 섹션을 편집 중일 때만 채워짐: 재생을 그 섹션 하나만 반복하도록 좁힌다
+  const [playScopeId, setPlayScopeId] = useState<string | null>(null);
   const songRef = useRef(song);
   songRef.current = song;
 
@@ -87,9 +89,10 @@ export function App() {
     [song.meta, song.sections, song.arrangement],
   );
   useEffect(() => {
-    engineRef.current?.setSong(song);
+    const scoped = playScopeId ? { ...song, arrangement: [playScopeId] } : song;
+    engineRef.current?.setSong(scoped);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [structure]);
+  }, [structure, playScopeId]);
 
   useEffect(() => {
     engineRef.current?.setMixer(mixer);
@@ -111,15 +114,16 @@ export function App() {
       setPlayhead(null);
       return;
     }
+    const locateIn = playScopeId ? { ...song, arrangement: [playScopeId] } : song;
     let frame = 0;
     const tick = () => {
-      const next = locate(song, engineRef.current?.getBeat() ?? 0);
+      const next = locate(locateIn, engineRef.current?.getBeat() ?? 0);
       setPlayhead((prev) => (samePlayhead(prev, next) ? prev : next));
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [playing, song]);
+  }, [playing, song, playScopeId]);
 
   // 같은 설정으로 다시 만든 곡: 편집 여부 판단과 섹션 "원래대로"의 기준
   const original = useMemo(() => generateSong({ genre, key, bpm, seed }), [genre, key, bpm, seed]);
@@ -303,6 +307,7 @@ export function App() {
           playhead={playhead}
           playing={playing}
           onToggle={() => void toggle()}
+          onSectionFocus={setPlayScopeId}
           onRegenerate={regenerate}
           onPatchMeta={patchMeta}
           onChange={applyEdit}
