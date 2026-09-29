@@ -35,6 +35,8 @@ const ALL_KEYS = [...MAJOR_KEYS, ...MINOR_KEYS];
 const btn = "rounded-lg px-4 py-2 font-medium transition-colors sm:px-5 sm:py-2.5 sm:text-base";
 const btnGhost = `${btn} border border-slate-200 bg-white text-slate-700 hover:bg-slate-50`;
 const card = "rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6";
+const summary =
+  "flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-slate-700 before:text-xs before:text-slate-400 before:content-['▶'] group-open:mb-2 group-open:before:content-['▼'] sm:text-base [&::-webkit-details-marker]:hidden";
 
 interface Mood {
   key: string;
@@ -62,6 +64,13 @@ const MOODS: Mood[] = [
 function buildPrompt(mood: Mood | undefined): string {
   const moodDesc = mood ? mood.desc : "원하는 분위기";
   return `나는 "${moodDesc}" 느낌의 곡을 만들려고 해. 이 분위기에 어울리는 조성(키), 템포(BPM), 코드 진행(예: I-V-vi-IV 같은 형태), 곡 구조(벌스/코러스 등)를 추천해줘. 그리고 내가 쓰는 작곡 툴은 팝/로파이/록/재즈 4가지 장르 프리셋만 지원하니, 이 중 어떤 장르가 가장 가까운지도 같이 알려줘. 음악을 전공하지 않은 사람도 이해할 수 있게 쉽게 설명해줘.`;
+}
+
+/** 장르·조성·BPM이 정해진 뒤, 지금 편집 중인 섹션 하나에 맞는 코드·리듬 아이디어를 AI에게 물어보도록 돕는다 */
+function buildSectionPrompt(song: Song, section: Song["sections"][number]): string {
+  const blurb = SECTION_BLURB[section.id];
+  const role = blurb ? blurb.replace(/^[^:]+:\s*/, "") : "새로 추가한 구간";
+  return `나는 지금 ${PRESETS[song.meta.genre].label} 장르, 조성 ${song.meta.key}, BPM ${song.meta.bpm}으로 곡을 만들고 있어. 지금 만들고 있는 부분은 "${section.name}"(${role}), 총 ${section.bars}마디야. 이 부분에 어울리는 코드 진행과 리듬(피아노 패턴·드럼 강조) 아이디어를 추천해줘. 음악을 전공하지 않은 사람도 이해할 수 있게 쉽게 설명해줘.`;
 }
 
 /** 클립보드 복사 등 짧은 피드백을 화면 하단에 잠깐 띄운다 */
@@ -135,14 +144,15 @@ export function Wizard({
   const playingSection = playhead ? song.sections.find((s) => s.id === playhead.sectionId) : undefined;
   const activeArrangementIndex = playhead?.arrangementIndex ?? null;
 
-  const copyPrompt = async () => {
+  const copyText = async (text: string) => {
     try {
-      await navigator.clipboard.writeText(prompt);
+      await navigator.clipboard.writeText(text);
       setToast("질문을 복사했습니다 ✓");
     } catch {
-      window.prompt("복사가 막혀 있습니다. 아래 문장을 직접 복사하세요.", prompt);
+      window.prompt("복사가 막혀 있습니다. 아래 문장을 직접 복사하세요.", text);
     }
   };
+  const copyPrompt = () => copyText(prompt);
 
   const addNewSection = () => {
     const name = window.prompt("새 섹션 이름을 입력하세요 (마지막 섹션을 복사해서 시작합니다)", `섹션 ${sections.length + 1}`);
@@ -319,6 +329,44 @@ export function Wizard({
               {SECTION_BLURB[currentSection.id]}
             </p>
           )}
+
+          <div className="space-y-2 rounded-lg border border-indigo-200 bg-indigo-50 p-3 sm:space-y-3 sm:p-4">
+            <p className="text-sm font-semibold text-indigo-700 sm:text-base">🤖 AI에게 이 섹션 질문하기</p>
+            <textarea
+              readOnly
+              value={buildSectionPrompt(song, currentSection)}
+              rows={3}
+              className="w-full resize-none rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-700 sm:p-3 sm:text-sm sm:leading-relaxed"
+            />
+            <button onClick={() => void copyText(buildSectionPrompt(song, currentSection))} className={btnGhost}>
+              📋 맞춤 질문 복사하기
+            </button>
+            <p className="text-xs text-indigo-700/70 sm:text-sm">
+              복사한 질문을 Gemini·ChatGPT에 붙여넣으면, 이 섹션에 어울리는 코드 진행과 리듬 아이디어를 받아볼 수 있어요.
+            </p>
+          </div>
+
+          <details className="group rounded-lg border border-slate-200 bg-white p-3 sm:p-4">
+            <summary className={summary}>🎹 코드·패턴 편집 방법</summary>
+            <div className="space-y-2 text-sm text-slate-600 sm:text-base">
+              <p>
+                <strong className="text-slate-800">코드:</strong> 아래 코드 카드를 눌러 이 섹션의 코드를 하나씩 바꿀 수 있어요.
+              </p>
+              <p>
+                <strong className="text-slate-800">피아노 패턴 4종류:</strong> 코드(화음을 한 번에 쾅), 아르페지오 ↑(낮은 음부터
+                차례로 하나씩), 아르페지오 ↑↓(오르내리며 순서대로), 브로큰(음을 건너뛰며 통통 튀는 리듬).
+              </p>
+              <p>
+                <strong className="text-slate-800">드럼 격자:</strong> 칸을 누를 때마다 꺼짐 → 보통 → 세게 순으로 바뀌어요. 킥은
+                저음으로 쿵, 스네어는 박자를 짝짝 짚어주고, 하이햇은 잘게 쪼개는 리듬을 만들어요. 나머지 레인(림샷·탐·라이드·크래시)은
+                필인이나 악센트를 줄 때 써요.
+              </p>
+              <p className="text-slate-500">
+                더 자세히 듣고 배우고 싶다면 "가이드" 탭의 레슨 2(코드 이름과 패턴 종류), 레슨 4(장르별 리듬 패턴)를 참고하세요.
+              </p>
+            </div>
+          </details>
+
           <ChordEditor song={song} active={null} onChange={onChange} onlySectionId={currentSection.id} />
           <PatternGrid song={song} original={original} playhead={playhead} onChange={onChange} forceSectionId={currentSection.id} />
           <div className="flex justify-between">
