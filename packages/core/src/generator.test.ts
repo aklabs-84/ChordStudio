@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { generateSong, mulberry32 } from "./generator";
 import { PRESETS } from "./patterns";
-import { GENRES, totalBars, validateSong } from "./schema";
+import { GENRES, validateSong } from "./schema";
 
 describe("mulberry32", () => {
   it("같은 시드는 같은 수열, 값은 [0,1)", () => {
@@ -70,11 +70,11 @@ describe("generateSong", () => {
     }
   });
 
-  it("벌스·코러스 두 섹션, 기본 재생 순서 A B A B", () => {
+  it("인트로·벌스·프리코러스·코러스·아웃트로 다섯 섹션, 기본 재생 순서도 그 순서", () => {
     const song = generateSong({ genre: "pop", seed: 1 });
-    expect(song.sections.map((s) => s.id)).toEqual(["A", "B"]);
-    expect(song.arrangement).toEqual(["A", "B", "A", "B"]);
-    expect(totalBars(song)).toBe(2 * (song.sections[0]!.bars + song.sections[1]!.bars));
+    expect(song.sections.map((s) => s.id)).toEqual(["A", "B", "Intro", "PreChorus", "Outro"]);
+    expect(song.arrangement).toEqual(["Intro", "A", "PreChorus", "B", "Outro"]);
+    expect(validateSong(song)).toEqual([]);
   });
 
   it("arrangement를 바꿀 수 있다", () => {

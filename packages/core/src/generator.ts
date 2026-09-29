@@ -17,6 +17,11 @@ export function mulberry32(seed: number): () => number {
 
 const MAJOR_KEYS = ["C", "G", "D", "A", "E", "B", "Gb", "Db", "Ab", "Eb", "Bb", "F"];
 const MINOR_KEYS = ["Am", "Em", "Bm", "F#m", "C#m", "G#m", "Ebm", "Bbm", "Fm", "Cm", "Gm", "Dm"];
+/** 벌스→코러스로 넘어가는 긴장감을 주는 공용 4마디 전환 진행 (장르 진행표와 별개로 조성 모드만으로 결정). */
+const PRE_CHORUS_DEGREES: Record<Mode, string[]> = {
+  major: ["IV", "V", "vi", "V7"],
+  minor: ["iv", "bVI", "V7", "V7"],
+};
 /** 시드가 정해 주는 조성이 단조일 확률 (장르 상관없이 장조가 더 흔하다) */
 const MINOR_CHANCE = 0.25;
 
@@ -82,9 +87,14 @@ export function generateSong(options: GenerateOptions): Song {
   const bpmDrawn = preset.bpm[0] + Math.floor(rng() * (preset.bpm[1] - preset.bpm[0] + 1));
   const bpm = options.bpm ?? bpmDrawn;
 
+  // 인트로/아웃트로는 코러스 진행 앞·뒷절반을 가져와 곡 전체와 조화를 이루게 하되, 조용한(low) 트랙으로 시작·마무리한다.
+  const half = Math.ceil(template.B.length / 2);
   const sections = [
     makeSection("A", "벌스", template.A, key, pickTracks("low")),
     makeSection("B", "코러스", template.B, key, pickTracks("high")),
+    makeSection("Intro", "인트로", template.B.slice(0, half), key, pickTracks("low")),
+    makeSection("PreChorus", "프리코러스", PRE_CHORUS_DEGREES[mode], key, pickTracks("low")),
+    makeSection("Outro", "아웃트로", template.B.slice(half), key, pickTracks("low")),
   ];
 
   return {
@@ -99,7 +109,7 @@ export function generateSong(options: GenerateOptions): Song {
       seed,
     },
     sections,
-    arrangement: options.arrangement ?? ["A", "B", "A", "B"],
+    arrangement: options.arrangement ?? ["Intro", "A", "PreChorus", "B", "Outro"],
     mixer: defaultMixer(),
   };
 }

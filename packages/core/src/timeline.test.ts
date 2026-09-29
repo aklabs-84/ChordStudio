@@ -4,7 +4,8 @@ import { locate } from "./timeline";
 import { totalBars } from "./schema";
 
 describe("locate", () => {
-  const song = generateSong({ genre: "pop", seed: 1 });
+  // arrangement를 A B A B로 고정해 섹션 경계 계산을 단순하게 검증한다 (기본 재생 순서는 인트로 등을 포함한 5섹션).
+  const song = generateSong({ genre: "pop", seed: 1, arrangement: ["A", "B", "A", "B"] });
   const [A, B] = song.sections;
   const aBeats = A!.bars * 4;
   const bBeats = B!.bars * 4;

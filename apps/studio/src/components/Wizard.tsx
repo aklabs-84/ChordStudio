@@ -42,6 +42,15 @@ interface Mood {
   desc: string;
 }
 
+/** 기본 5섹션(인트로~아웃트로)의 역할을 한 줄로 설명해, 위자드에서 곡 구조를 자연스럽게 익히게 한다. 직접 추가한 섹션(id가 다름)은 설명 없음. */
+const SECTION_BLURB: Record<string, string> = {
+  Intro: "인트로: 곡을 여는 부분이에요. 짧고 단순하게 시작해 듣는 사람을 자연스럽게 끌어들여요.",
+  A: "벌스: 이야기를 풀어가는 부분이에요. 코러스보다 차분하게 진행해서 후렴을 돋보이게 해요.",
+  PreChorus: "프리코러스: 벌스에서 코러스로 넘어가는 다리예요. 긴장감을 조금씩 쌓아 올려요.",
+  B: "코러스: 곡에서 가장 강하고 기억에 남는 부분이에요. 악기와 에너지를 가장 풍성하게 써요.",
+  Outro: "아웃트로: 곡을 마무리하는 부분이에요. 다시 잦아들며 자연스럽게 끝을 맺어요.",
+};
+
 const MOODS: Mood[] = [
   { key: "kpop", label: "K-POP 댄스", desc: "신나고 통통 튀는 K-POP 댄스곡" },
   { key: "lofi", label: "로파이", desc: "차분하고 몽환적인 로파이 힙합" },
@@ -305,6 +314,11 @@ export function Wizard({
           <h2 className="text-lg font-bold sm:text-xl">
             {clampedStep + 1}. {currentSection.name} 편집 ({currentSection.bars}마디)
           </h2>
+          {SECTION_BLURB[currentSection.id] && (
+            <p className="rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-700 sm:text-base">
+              {SECTION_BLURB[currentSection.id]}
+            </p>
+          )}
           <ChordEditor song={song} active={null} onChange={onChange} onlySectionId={currentSection.id} />
           <PatternGrid song={song} original={original} playhead={playhead} onChange={onChange} forceSectionId={currentSection.id} />
           <div className="flex justify-between">

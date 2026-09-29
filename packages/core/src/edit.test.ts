@@ -83,22 +83,22 @@ describe("코드 편집", () => {
 });
 
 describe("재생 순서 편집", () => {
-  // 기본: A B A B
+  // 기본: Intro A PreChorus B Outro
   it("항목을 앞뒤로 옮긴다", () => {
-    expect(moveArrangementItem(song, 1, -1).arrangement).toEqual(["B", "A", "A", "B"]);
-    expect(moveArrangementItem(song, 0, 1).arrangement).toEqual(["B", "A", "A", "B"]);
-    expect(song.arrangement).toEqual(["A", "B", "A", "B"]);
+    expect(moveArrangementItem(song, 1, -1).arrangement).toEqual(["A", "Intro", "PreChorus", "B", "Outro"]);
+    expect(moveArrangementItem(song, 0, 1).arrangement).toEqual(["A", "Intro", "PreChorus", "B", "Outro"]);
+    expect(song.arrangement).toEqual(["Intro", "A", "PreChorus", "B", "Outro"]);
   });
 
   it("범위를 벗어나는 이동은 무시한다", () => {
     expect(moveArrangementItem(song, 0, -1)).toBe(song);
-    expect(moveArrangementItem(song, 3, 1)).toBe(song);
+    expect(moveArrangementItem(song, 4, 1)).toBe(song);
     expect(moveArrangementItem(song, 9, 1)).toBe(song);
   });
 
   it("항목을 빼고, 마지막 하나는 남긴다", () => {
     const fewer = removeArrangementItem(song, 0);
-    expect(fewer.arrangement).toEqual(["B", "A", "B"]);
+    expect(fewer.arrangement).toEqual(["A", "PreChorus", "B", "Outro"]);
     let one = fewer;
     while (one.arrangement.length > 1) one = removeArrangementItem(one, 0);
     expect(removeArrangementItem(one, 0)).toBe(one);
@@ -107,7 +107,7 @@ describe("재생 순서 편집", () => {
 
   it("끝에 섹션을 더하면 곡이 길어지고, 없는 섹션은 무시한다", () => {
     const more = appendArrangementItem(song, "B");
-    expect(more.arrangement).toEqual(["A", "B", "A", "B", "B"]);
+    expect(more.arrangement).toEqual(["Intro", "A", "PreChorus", "B", "Outro", "B"]);
     expect(songToEvents(more).totalBeats).toBeGreaterThan(songToEvents(song).totalBeats);
     expect(appendArrangementItem(song, "Z")).toBe(song);
     expect(validateSong(more)).toEqual([]);
