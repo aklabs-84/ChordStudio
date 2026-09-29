@@ -42,8 +42,8 @@ const samePlayhead = (a: Playhead | null, b: Playhead | null): boolean =>
 const TRACK_LABEL: Record<TrackId, string> = { piano: "피아노", bass: "베이스", drums: "드럼", strings: "스트링" };
 const VOLUME_MIN = -30;
 const VOLUME_MAX = 6;
-const MAJOR_KEYS = ["C", "G", "D", "A", "F", "Bb", "Eb"];
-const MINOR_KEYS = ["Am", "Em", "Dm", "Bm", "Gm", "Cm"];
+const MAJOR_KEYS = ["C", "G", "D", "A", "E", "B", "Gb", "Db", "Ab", "Eb", "Bb", "F"];
+const MINOR_KEYS = ["Am", "Em", "Bm", "F#m", "C#m", "G#m", "Ebm", "Bbm", "Fm", "Cm", "Gm", "Dm"];
 const ALL_KEYS = [...MAJOR_KEYS, ...MINOR_KEYS];
 
 const btn = "rounded-lg px-4 py-2 font-medium transition-colors";

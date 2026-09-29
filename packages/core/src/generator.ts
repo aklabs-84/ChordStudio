@@ -15,8 +15,8 @@ export function mulberry32(seed: number): () => number {
   };
 }
 
-const MAJOR_KEYS = ["C", "G", "D", "A", "F", "Bb", "Eb"];
-const MINOR_KEYS = ["Am", "Em", "Dm", "Bm", "Gm", "Cm"];
+const MAJOR_KEYS = ["C", "G", "D", "A", "E", "B", "Gb", "Db", "Ab", "Eb", "Bb", "F"];
+const MINOR_KEYS = ["Am", "Em", "Bm", "F#m", "C#m", "G#m", "Ebm", "Bbm", "Fm", "Cm", "Gm", "Dm"];
 /** 시드가 정해 주는 조성이 단조일 확률 (장르 상관없이 장조가 더 흔하다) */
 const MINOR_CHANCE = 0.25;
 

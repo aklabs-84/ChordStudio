@@ -2,7 +2,7 @@
 // AI 추천받기 → 곡 기획 → 섹션별 편집(N단계) → 완성/내보내기 순서로 한 단계씩 보여준다.
 // 실제 코드 진행·패턴 편집·MIDI 내보내기 로직은 전부 App.tsx/packages/core를 그대로 재사용하고,
 // 이 파일은 "한 번에 하나씩 보여주는" 레이아웃만 담당한다.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { addSection, GENRES, PRESETS, TRACK_IDS, type Genre, type MixerChannel, type Playhead, type Song, type TrackId } from "@chord-studio/core";
 import { ChordEditor } from "./ChordEditor";
 import { PatternGrid } from "./PatternGrid";
@@ -26,13 +26,13 @@ interface Props {
 const TRACK_LABEL: Record<TrackId, string> = { piano: "피아노", bass: "베이스", drums: "드럼", strings: "스트링" };
 const VOLUME_MIN = -30;
 const VOLUME_MAX = 6;
-const MAJOR_KEYS = ["C", "G", "D", "A", "F", "Bb", "Eb"];
-const MINOR_KEYS = ["Am", "Em", "Dm", "Bm", "Gm", "Cm"];
+const MAJOR_KEYS = ["C", "G", "D", "A", "E", "B", "Gb", "Db", "Ab", "Eb", "Bb", "F"];
+const MINOR_KEYS = ["Am", "Em", "Bm", "F#m", "C#m", "G#m", "Ebm", "Bbm", "Fm", "Cm", "Gm", "Dm"];
 const ALL_KEYS = [...MAJOR_KEYS, ...MINOR_KEYS];
 
-const btn = "rounded-lg px-4 py-2 font-medium transition-colors";
+const btn = "rounded-lg px-4 py-2 font-medium transition-colors sm:px-5 sm:py-2.5 sm:text-base";
 const btnGhost = `${btn} border border-slate-200 bg-white text-slate-700 hover:bg-slate-50`;
-const card = "rounded-xl border border-slate-200 bg-white p-4 shadow-sm";
+const card = "rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6";
 
 interface Mood {
   key: string;
@@ -51,6 +51,18 @@ const MOODS: Mood[] = [
 function buildPrompt(mood: Mood | undefined): string {
   const moodDesc = mood ? mood.desc : "원하는 분위기";
   return `나는 "${moodDesc}" 느낌의 곡을 만들려고 해. 이 분위기에 어울리는 조성(키), 템포(BPM), 코드 진행(예: I-V-vi-IV 같은 형태), 곡 구조(벌스/코러스 등)를 추천해줘. 그리고 내가 쓰는 작곡 툴은 팝/로파이/록/재즈 4가지 장르 프리셋만 지원하니, 이 중 어떤 장르가 가장 가까운지도 같이 알려줘. 음악을 전공하지 않은 사람도 이해할 수 있게 쉽게 설명해줘.`;
+}
+
+/** 클립보드 복사 등 짧은 피드백을 화면 하단에 잠깐 띄운다 */
+function Toast({ message }: { message: string }) {
+  return (
+    <div
+      role="status"
+      className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4"
+    >
+      <span className="rounded-full bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-lg">{message}</span>
+    </div>
+  );
 }
 
 /** 곡 구조(재생 순서 우선, 없는 섹션은 뒤로) 순서로 중복 없이 섹션을 나열 */
@@ -83,6 +95,13 @@ export function Wizard({
   const totalSteps = 2 + sections.length + 1; // AI 추천 + 곡 기획 + 섹션들 + 완성
   const [step, setStep] = useState(0);
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const clampedStep = Math.min(step, totalSteps - 1);
   const isAiStep = clampedStep === 0;
@@ -100,6 +119,7 @@ export function Wizard({
   const copyPrompt = async () => {
     try {
       await navigator.clipboard.writeText(prompt);
+      setToast("질문을 복사했습니다 ✓");
     } catch {
       window.prompt("복사가 막혀 있습니다. 아래 문장을 직접 복사하세요.", prompt);
     }
@@ -118,7 +138,7 @@ export function Wizard({
       key={n}
       onClick={() => setStep(n)}
       aria-current={clampedStep === n}
-      className={`flex-none rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+      className={`flex-none rounded-full px-3 py-1.5 text-xs font-medium transition-colors sm:px-4 sm:py-2 sm:text-sm ${
         clampedStep === n ? "bg-indigo-600 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
       }`}
     >
@@ -135,15 +155,15 @@ export function Wizard({
         <button
           onClick={addNewSection}
           aria-label="새 섹션 추가"
-          className="flex-none rounded-full border border-dashed border-slate-300 px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+          className="flex-none rounded-full border border-dashed border-slate-300 px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 sm:px-4 sm:py-2 sm:text-sm"
         >
           + 새 섹션
         </button>
         {chip(totalSteps - 1, "★ 완성")}
       </div>
 
-      <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2">
-        <span className="text-sm text-slate-600">
+      <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 sm:px-4 sm:py-3">
+        <span className="text-sm text-slate-600 sm:text-base">
           {bpm} BPM · {key} · {song.meta.title}
           {playing && playingSection && (
             <span className="ml-2 text-amber-600">
@@ -158,19 +178,19 @@ export function Wizard({
 
       {isAiStep && (
         <section className={`${card} space-y-4`} aria-label="AI 추천받기">
-          <h2 className="text-lg font-bold">1. AI 프로듀서에게 곡 추천받기</h2>
-          <p className="text-sm text-slate-500">
+          <h2 className="text-lg font-bold sm:text-xl">1. AI 프로듀서에게 곡 추천받기</h2>
+          <p className="text-sm text-slate-500 sm:text-base">
             어떤 분위기의 곡을 만들고 싶은지 고르면, AI에게 물어볼 맞춤 질문을 만들어줘요. 조성·BPM·장르는 다음 단계에서 정해요.
           </p>
 
-          <div className="space-y-2 rounded-lg border border-indigo-200 bg-indigo-50 p-3">
-            <div className="flex flex-wrap gap-2" role="group" aria-label="무드">
+          <div className="space-y-2 rounded-lg border border-indigo-200 bg-indigo-50 p-3 sm:space-y-3 sm:p-4">
+            <div className="flex flex-wrap gap-2 sm:gap-3" role="group" aria-label="무드">
               {MOODS.map((m) => (
                 <button
                   key={m.key}
                   onClick={() => setSelectedMood(m.key === selectedMood ? null : m.key)}
                   aria-pressed={m.key === selectedMood}
-                  className={`rounded-full px-3 py-1 text-xs font-medium ${
+                  className={`rounded-full px-3 py-1 text-xs font-medium sm:px-4 sm:py-1.5 sm:text-sm ${
                     m.key === selectedMood ? "bg-indigo-600 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                   }`}
                 >
@@ -182,9 +202,9 @@ export function Wizard({
               readOnly
               value={prompt}
               rows={4}
-              className="w-full resize-none rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-700"
+              className="w-full resize-none rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-700 sm:p-3 sm:text-sm sm:leading-relaxed"
             />
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 sm:gap-3">
               <button onClick={() => void copyPrompt()} className={btnGhost}>
                 📋 맞춤 질문 복사하기
               </button>
@@ -200,7 +220,7 @@ export function Wizard({
                 ChatGPT 열기 ↗
               </a>
             </div>
-            <p className="text-xs text-indigo-700/70">
+            <p className="text-xs text-indigo-700/70 sm:text-sm">
               위 질문을 복사해서 Gemini나 ChatGPT에 붙여넣으면, 조성·BPM·코드 진행·구조에 대한 아이디어를 받아볼 수 있어요. 앱이 직접
               AI를 호출하지는 않아요.
             </p>
@@ -216,10 +236,10 @@ export function Wizard({
 
       {isPlanStep && (
         <section className={`${card} space-y-4`} aria-label="곡 기획">
-          <h2 className="text-lg font-bold">2. 곡 기획</h2>
-          <p className="text-sm text-slate-500">AI에게 받은 추천을 참고해서, 실제로 사용할 장르·조성·BPM을 골라보세요.</p>
+          <h2 className="text-lg font-bold sm:text-xl">2. 곡 기획</h2>
+          <p className="text-sm text-slate-500 sm:text-base">AI에게 받은 추천을 참고해서, 실제로 사용할 장르·조성·BPM을 골라보세요.</p>
 
-          <div className="flex flex-wrap gap-2" role="group" aria-label="장르">
+          <div className="flex flex-wrap gap-2 sm:gap-3" role="group" aria-label="장르">
             {GENRES.map((g) => (
               <button
                 key={g}
@@ -232,12 +252,12 @@ export function Wizard({
             ))}
           </div>
 
-          <label className="flex items-center gap-3 text-sm">
+          <label className="flex items-center gap-3 text-sm sm:text-base">
             <span className="w-12 shrink-0">조성</span>
             <select
               value={key}
               onChange={(e) => onRegenerate({ genre, seed: seed ?? 1, key: e.target.value, bpm })}
-              className="min-w-0 flex-1 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-slate-700"
+              className="min-w-0 flex-1 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-slate-700 sm:py-2 sm:text-base"
             >
               {ALL_KEYS.map((k) => (
                 <option key={k} value={k}>
@@ -246,7 +266,7 @@ export function Wizard({
               ))}
             </select>
           </label>
-          <label className="flex items-center gap-3 text-sm">
+          <label className="flex items-center gap-3 text-sm sm:text-base">
             <span className="w-12 shrink-0">BPM</span>
             <input
               type="range"
@@ -256,7 +276,7 @@ export function Wizard({
               onChange={(e) => onPatchMeta({ bpm: Number(e.target.value) })}
               className="min-w-0 flex-1 accent-indigo-600"
             />
-            <span className="w-8 text-right font-mono text-xs text-slate-600">{bpm}</span>
+            <span className="w-8 text-right font-mono text-xs text-slate-600 sm:text-sm">{bpm}</span>
           </label>
 
           <div className="flex justify-between">
@@ -272,7 +292,7 @@ export function Wizard({
 
       {currentSection && (
         <section className={`${card} space-y-4`} aria-label={`${currentSection.name} 편집`}>
-          <h2 className="text-lg font-bold">
+          <h2 className="text-lg font-bold sm:text-xl">
             {clampedStep + 1}. {currentSection.name} 편집 ({currentSection.bars}마디)
           </h2>
           <ChordEditor song={song} active={null} onChange={onChange} onlySectionId={currentSection.id} />
@@ -290,9 +310,9 @@ export function Wizard({
 
       {isFinal && (
         <section className={`${card} space-y-4`} aria-label="완성 및 내보내기">
-          <h2 className="text-lg font-bold">★ 완곡 완성 &amp; 내보내기</h2>
+          <h2 className="text-lg font-bold sm:text-xl">★ 완곡 완성 &amp; 내보내기</h2>
 
-          <ol className="flex flex-wrap gap-1.5 text-xs" aria-label="곡 구조 미리보기">
+          <ol className="flex flex-wrap gap-1.5 text-xs sm:gap-2 sm:text-sm" aria-label="곡 구조 미리보기">
             {song.arrangement.map((id, i) => {
               const s = song.sections.find((sec) => sec.id === id);
               const active = activeArrangementIndex === i;
@@ -300,7 +320,7 @@ export function Wizard({
                 <li
                   key={i}
                   aria-current={active ? "true" : undefined}
-                  className={`rounded px-2 py-1 ${active ? "bg-amber-400 font-bold text-slate-900" : "border border-slate-200 bg-white text-slate-600"}`}
+                  className={`rounded px-2 py-1 sm:px-3 sm:py-1.5 ${active ? "bg-amber-400 font-bold text-slate-900" : "border border-slate-200 bg-white text-slate-600"}`}
                 >
                   {s?.name ?? id}
                 </li>
@@ -309,12 +329,12 @@ export function Wizard({
           </ol>
 
           <div className="space-y-3">
-            <h3 className="font-semibold">믹서</h3>
+            <h3 className="font-semibold sm:text-lg">믹서</h3>
             {TRACK_IDS.map((id) => {
               const ch = mixer[id];
               return (
                 <div key={id} className="flex items-center gap-2">
-                  <span className="w-12 shrink-0 text-sm">{TRACK_LABEL[id]}</span>
+                  <span className="w-12 shrink-0 text-sm sm:text-base">{TRACK_LABEL[id]}</span>
                   <input
                     type="range"
                     min={VOLUME_MIN}
@@ -374,6 +394,7 @@ export function Wizard({
           </div>
         </section>
       )}
+      {toast && <Toast message={toast} />}
     </div>
   );
 }
