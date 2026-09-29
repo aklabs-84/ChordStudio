@@ -1,0 +1,4 @@
+Virtuosity Drums (Versilian Studios x Karoryfer Samples, performed by Austin McMahon)
+Source: https://github.com/sfzinstruments/virtuosity_drums  (Samples/mid mic mix)
+License: CC0 1.0 Universal (public domain dedication, no attribution required)
+Modified: 42 FLAC files trimmed/faded and converted to 128kbps mp3.

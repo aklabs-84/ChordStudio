@@ -1,0 +1,25 @@
+{
+  "name": "chord-studio",
+  "private": true,
+  "version": "0.0.0",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @chord-studio/studio",
+    "build": "npm run build -w @chord-studio/studio",
+    "test": "vitest run",
+    "typecheck": "tsc -b"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1",
+    "vitest": "^5.0.2"
+  }
+}

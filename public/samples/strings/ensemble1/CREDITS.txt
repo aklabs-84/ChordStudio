@@ -1,0 +1,4 @@
+FluidR3 GM (string_ensemble_1) via gleitz/midi-js-soundfonts
+https://github.com/gleitz/midi-js-soundfonts
+License: Creative Commons Attribution 3.0 (per mirror README) - attribution required.
+Sampled every 3 semitones C2..A6, volume +12dB, mp3 128k.
