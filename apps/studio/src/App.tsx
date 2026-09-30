@@ -307,6 +307,8 @@ export function App() {
     }
   };
 
+  const previewChord = (symbol: string) => engineRef.current?.previewChord(symbol);
+
   // 편집기에는 재생 위치 전체가 아니라 "코드/순서 칸이 바뀔 때만 달라지는 값"을 넘겨, 16분음표마다 다시 그리지 않게 한다
   const activeSectionId = playhead?.sectionId;
   const activeChordIndex = playhead?.chordIndex;
@@ -433,6 +435,7 @@ export function App() {
           onExportJson={exportJson}
           onCopyLink={() => void copyLink()}
           linkNote={linkNote}
+          onPreviewChord={previewChord}
         />
       )}
 
@@ -443,6 +446,7 @@ export function App() {
             applyEdit(() => newSong);
           }}
           onNavigateToStudio={() => setView("studio")}
+          onPreviewChord={previewChord}
         />
       )}
 
@@ -685,7 +689,7 @@ export function App() {
 
             <ArrangementEditor song={song} activeIndex={activeArrangementIndex} onChange={applyEdit} />
 
-            <ChordEditor song={song} active={activeChord} onChange={applyEdit} />
+            <ChordEditor song={song} active={activeChord} onChange={applyEdit} onPreviewChord={previewChord} />
           </section>
 
           <PatternGrid song={song} original={original} playhead={playhead} onChange={applyEdit} />

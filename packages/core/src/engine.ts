@@ -1,9 +1,10 @@
 // 재생 엔진: Song → songToEvents → Tone.Transport 스케줄. 악기는 TrackInstrument로 갈아끼운다.
 // 브라우저 전용(오디오 컨텍스트 필요). 사용자 클릭 뒤에 play()를 불러야 소리가 난다.
 import * as Tone from "tone";
-import { songToEvents } from "./events";
+import { songToEvents, type NoteEvent } from "./events";
 import { BEATS_PER_BAR, TRACK_IDS, type Song, type TrackId } from "./schema";
 import { createInstruments } from "./samplers";
+import { chordToMidiNotes, isValidChord } from "./theory";
 export { STRINGS_VOICES, type StringsVoiceId } from "./samplers";
 import type { TrackInstrument } from "./synths";
 
@@ -30,6 +31,8 @@ export interface Engine {
   setMixer(mixer: Song["mixer"]): void;
   /** 스트링 음색 바꾸기 (다음 음부터 적용) */
   setStringsVoice(id: string): void;
+  /** 코드 기호의 화음을 피아노로 짧게 미리듣기 (재생/편집과 무관, 전개 스케줄을 건드리지 않는다) */
+  previewChord(symbol: string): void;
   play(): Promise<void>;
   /** 현재 위치에서 멈춤 */
   pause(): void;
@@ -150,6 +153,16 @@ export function createEngine(options: EngineOptions = {}): Engine {
     },
     setMixer: applyMixer,
     setStringsVoice: (id) => instruments.strings.setVoice?.(id),
+    previewChord(symbol) {
+      if (!isValidChord(symbol)) return;
+      void Tone.start();
+      const time = Tone.now();
+      const durationSec = 0.7;
+      for (const midi of chordToMidiNotes(symbol)) {
+        const e: NoteEvent = { track: "piano", time: 0, duration: 0, midi, velocity: 0.8 };
+        instruments.piano.play(e, durationSec, time);
+      }
+    },
     async play() {
       await Tone.start();
       await reverb.ready;

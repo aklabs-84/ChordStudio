@@ -18,6 +18,7 @@ interface Props {
   song: Song;
   onApply: (newSong: Song) => void;
   onNavigateToStudio: () => void;
+  onPreviewChord?: (symbol: string) => void;
 }
 
 interface DraftSection {
@@ -122,7 +123,7 @@ function parseLineChords(line: string, targetChords: ChordSlot[], fallbackKey: s
   }
 }
 
-export function ChordInputView({ song, onApply, onNavigateToStudio }: Props) {
+export function ChordInputView({ song, onApply, onNavigateToStudio, onPreviewChord }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [title, setTitle] = useState(song.meta.title || "외부 노래 코드");
   const [key, setKey] = useState(song.meta.key || "C");
@@ -717,6 +718,15 @@ export function ChordInputView({ song, onApply, onNavigateToStudio }: Props) {
                             className="w-16 rounded-md bg-white px-2 py-1 text-center font-mono text-sm font-bold text-slate-800 shadow-2xs focus:outline-hidden"
                             placeholder="코드"
                           />
+                          <button
+                            onClick={() => onPreviewChord?.(chord.symbol.trim())}
+                            disabled={!isValid}
+                            className="h-6 w-6 rounded-full text-indigo-500 hover:bg-indigo-100 hover:text-indigo-700 disabled:opacity-30 disabled:hover:bg-transparent flex items-center justify-center text-xs"
+                            title="이 코드 화음 미리듣기"
+                            aria-label={`${chord.symbol} 화음 미리듣기`}
+                          >
+                            ▶
+                          </button>
                           <button
                             onClick={() => toggleChordBeats(section.id, cIdx)}
                             className={`rounded-md px-1.5 py-1 text-[11px] font-semibold transition-colors ${

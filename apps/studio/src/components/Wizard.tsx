@@ -45,6 +45,7 @@ interface Props {
   onExportJson: () => void;
   onCopyLink: () => void;
   linkNote: string | null;
+  onPreviewChord?: (symbol: string) => void;
 }
 
 const TRACK_LABEL: Record<TrackId, string> = { piano: "피아노", bass: "베이스", drums: "드럼", strings: "스트링" };
@@ -168,6 +169,7 @@ export function Wizard({
   onExportJson,
   onCopyLink,
   linkNote,
+  onPreviewChord,
 }: Props) {
   const { mixer } = song;
   const { genre, key, bpm, seed } = song.meta;
@@ -518,7 +520,7 @@ export function Wizard({
             </div>
           </details>
 
-          <ChordEditor song={song} active={null} onChange={onChange} onlySectionId={currentSection.id} />
+          <ChordEditor song={song} active={null} onChange={onChange} onlySectionId={currentSection.id} onPreviewChord={onPreviewChord} />
           <PatternGrid song={song} original={original} playhead={playhead} onChange={onChange} forceSectionId={currentSection.id} />
           <div className="flex justify-between">
             <button onClick={() => setStep(clampedStep - 1)} className={btnGhost}>

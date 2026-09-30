@@ -9,6 +9,8 @@ interface Props {
   onChange: (update: (song: Song) => Song) => void;
   /** 있으면 이 섹션 하나만 보여준다 (위자드 단계별 화면용) */
   onlySectionId?: string;
+  /** 코드 버튼을 클릭했을 때 화음을 짧게 미리듣기 */
+  onPreviewChord?: (symbol: string) => void;
 }
 
 interface Selected {
@@ -19,7 +21,7 @@ interface Selected {
 const small =
   "rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white";
 
-export const ChordEditor = memo(function ChordEditor({ song, active: playing, onChange, onlySectionId }: Props) {
+export const ChordEditor = memo(function ChordEditor({ song, active: playing, onChange, onlySectionId, onPreviewChord }: Props) {
   const [sel, setSel] = useState<Selected | null>(null);
   const [draft, setDraft] = useState("");
   // Esc로 닫을 때는 blur가 commit을 부르므로 이번 한 번은 저장하지 않도록 표시한다
@@ -66,7 +68,10 @@ export const ChordEditor = memo(function ChordEditor({ song, active: playing, on
               return (
                 <li key={i}>
                   <button
-                    onClick={() => setSel(selected ? null : { sectionId: s.id, index: i })}
+                    onClick={() => {
+                      setSel(selected ? null : { sectionId: s.id, index: i });
+                      onPreviewChord?.(c.symbol);
+                    }}
                     aria-current={active ? "true" : undefined}
                     aria-pressed={selected}
                     aria-label={`${s.name} ${i + 1}번 코드 ${c.symbol} 편집`}

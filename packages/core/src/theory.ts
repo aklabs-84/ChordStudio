@@ -132,6 +132,15 @@ export function chordPitchClasses(chord: ParsedChord): number[] {
   return pcs;
 }
 
+/** 코드 기호 → 미리듣기용 MIDI 노트 배열 (근음이 baseOctave에 놓이는 block-chord 보이싱). */
+export function chordToMidiNotes(symbol: string, baseOctave = 4): number[] {
+  const chord = parseChord(symbol);
+  const rootMidi = (baseOctave + 1) * 12 + chord.root;
+  const notes = [...new Set(chordIntervals(chord).map((iv) => rootMidi + iv))];
+  if (chord.bass !== undefined) notes.unshift(baseOctave * 12 + chord.bass);
+  return notes;
+}
+
 /** 파싱된 코드 → canonical 기호. */
 export function formatChord(chord: ParsedChord, useFlats = false): string {
   const base = pcName(chord.root, useFlats) + chord.quality;
