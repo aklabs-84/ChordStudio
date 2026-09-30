@@ -16,6 +16,7 @@ import {
   songFromShareHash,
   songToMidi,
   songToShareHash,
+  transposeSong,
   type Genre,
   type MixerChannel,
   type Playhead,
@@ -179,6 +180,9 @@ export function App() {
   };
 
   const patchMeta = (patch: Partial<Song["meta"]>) => setSong((s) => ({ ...s, meta: { ...s.meta, ...patch } }));
+
+  /** 코드 진행은 그대로 두고 조성만 전조한다 (완전 재생성이 아님) */
+  const changeKey = (newKey: string) => setSong((s) => transposeSong(s, newKey));
 
   const updateChannel = (id: TrackId, patch: Partial<MixerChannel>) =>
     setSong((s) => ({ ...s, mixer: { ...s.mixer, [id]: { ...s.mixer[id], ...patch } } }));
@@ -394,6 +398,7 @@ export function App() {
           onRegenerate={regenerate}
           onStartBlank={startBlank}
           onLoadDemoSong={loadDemoSong}
+          onChangeKey={changeKey}
           onPatchMeta={patchMeta}
           onChange={applyEdit}
           onUpdateChannel={updateChannel}
@@ -426,7 +431,7 @@ export function App() {
                 <span className="w-12 shrink-0">조성</span>
                 <select
                   value={key}
-                  onChange={(e) => regenerate({ genre, seed: seed ?? 1, key: e.target.value, bpm })}
+                  onChange={(e) => changeKey(e.target.value)}
                   className="min-w-0 flex-1 rounded-md border border-slate-200 bg-white px-2 py-1.5"
                 >
                   {ALL_KEYS.map((k) => (
@@ -479,14 +484,18 @@ export function App() {
               </button>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-slate-500">샘플 곡</span>
-              {GENRES.map((g) => (
-                <button key={g} onClick={() => void loadDemoSong(g)} className={btnGhost}>
-                  {PRESETS[g].label}
-                </button>
-              ))}
-            </div>
+            <details className="group rounded-lg border border-slate-200 bg-white p-2">
+              <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-slate-600 before:text-xs before:text-slate-400 before:content-['▶'] group-open:mb-2 group-open:before:content-['▼'] [&::-webkit-details-marker]:hidden">
+                샘플 곡
+              </summary>
+              <div className="flex flex-wrap gap-2">
+                {GENRES.map((g) => (
+                  <button key={g} onClick={() => void loadDemoSong(g)} className={btnGhost}>
+                    {PRESETS[g].label}
+                  </button>
+                ))}
+              </div>
+            </details>
 
             <div className="flex flex-wrap gap-2">
               <button onClick={exportJson} className={btnGhost}>

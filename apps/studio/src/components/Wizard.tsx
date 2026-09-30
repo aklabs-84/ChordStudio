@@ -24,6 +24,8 @@ interface Props {
   onRegenerate: (opts: { genre: Genre; seed: number; key?: string; bpm?: number }) => void;
   onStartBlank: () => void;
   onLoadDemoSong: (genre: Genre) => void;
+  /** 코드 진행은 그대로 두고 조성만 전조 */
+  onChangeKey: (key: string) => void;
   onPatchMeta: (patch: Partial<Song["meta"]>) => void;
   onChange: (update: (song: Song) => Song) => void;
   onUpdateChannel: (id: TrackId, patch: Partial<MixerChannel>) => void;
@@ -118,6 +120,7 @@ export function Wizard({
   onRegenerate,
   onStartBlank,
   onLoadDemoSong,
+  onChangeKey,
   onPatchMeta,
   onChange,
   onUpdateChannel,
@@ -339,7 +342,7 @@ export function Wizard({
             <span className="w-12 shrink-0">조성</span>
             <select
               value={key}
-              onChange={(e) => onRegenerate({ genre, seed: seed ?? 1, key: e.target.value, bpm })}
+              onChange={(e) => onChangeKey(e.target.value)}
               className="min-w-0 flex-1 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-slate-700 sm:py-2 sm:text-base"
             >
               {ALL_KEYS.map((k) => (
@@ -366,14 +369,16 @@ export function Wizard({
             📄 빈 곡에서 시작 (섹션 없이 처음부터)
           </button>
 
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <span className="text-sm text-slate-500 sm:text-base">샘플 곡 바로 불러오기</span>
-            {GENRES.map((g) => (
-              <button key={g} onClick={() => onLoadDemoSong(g)} className={btnGhost}>
-                {PRESETS[g].label}
-              </button>
-            ))}
-          </div>
+          <details className="group rounded-lg border border-slate-200 bg-white p-2 sm:p-3">
+            <summary className={summary}>샘플 곡 바로 불러오기</summary>
+            <div className="flex flex-wrap gap-2 sm:gap-3">
+              {GENRES.map((g) => (
+                <button key={g} onClick={() => onLoadDemoSong(g)} className={btnGhost}>
+                  {PRESETS[g].label}
+                </button>
+              ))}
+            </div>
+          </details>
 
           <div className="flex justify-between">
             <button onClick={() => setStep(0)} className={btnGhost}>

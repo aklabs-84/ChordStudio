@@ -1,6 +1,6 @@
 // 곡 편집용 순수 함수. 원본을 바꾸지 않고 새 Song을 돌려주며, 결과는 항상 validateSong을 통과한다.
 // 할 수 없는 편집(잘못된 코드, 범위 밖 박자 등)은 같은 song을 그대로 돌려준다.
-import { isValidChord } from "./theory";
+import { isValidChord, keyUsesFlats, semitonesBetweenKeys, transposeSymbol } from "./theory";
 import {
   BEATS_PER_BAR,
   SONG_LIMITS,
@@ -90,6 +90,21 @@ export function removeChord(song: Song, sectionId: string, index: number): Song 
     if (s.chords.length <= 1 || !s.chords[index]) return null;
     return withChords(s, s.chords.filter((_, i) => i !== index));
   });
+}
+
+/** 곡 전체(모든 섹션의 코드)를 새 조성으로 전조한다. 패턴·구조·믹서는 그대로 유지. 같은 조성이면 그대로 둔다. */
+export function transposeSong(song: Song, newKey: string): Song {
+  if (newKey === song.meta.key) return song;
+  const semitones = semitonesBetweenKeys(song.meta.key, newKey);
+  const useFlats = keyUsesFlats(newKey);
+  return {
+    ...song,
+    meta: { ...song.meta, key: newKey },
+    sections: song.sections.map((s) => ({
+      ...s,
+      chords: s.chords.map((c) => ({ ...c, symbol: transposeSymbol(c.symbol, semitones, useFlats) })),
+    })),
+  };
 }
 
 /** 재생 순서에서 index번째 항목을 delta칸(−1 = 앞, +1 = 뒤) 옮긴다. 범위를 벗어나면 그대로 둔다. */
