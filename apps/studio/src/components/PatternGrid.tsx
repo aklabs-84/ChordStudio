@@ -167,14 +167,19 @@ export function PatternGrid({ song, original, playhead, onChange, forceSectionId
     : undefined;
   const playScope =
     playhead && playing ? scopeOfBar(playhead.bar, playing.bars) : null;
-  const following = !forceSectionId && follow && !!playing && !!playScope;
-  const sectionId = forceSectionId ?? (following ? playing!.id : pickedId);
-  const pickedOrPlayScope: PatternScope = following ? playScope! : pickedScope;
+  // 섹션 고정 화면(forceSectionId, 위자드의 섹션 편집 화면)에서는 섹션 자체는 못 바꾸지만,
+  // 지금 재생 중인 섹션이 바로 이 화면의 섹션이라면 마디 종류(일반/첫/마지막)는 그대로 따라가야 한다.
+  const sectionFollowing = !forceSectionId && follow && !!playing;
+  const sectionId = forceSectionId ?? (sectionFollowing ? playing!.id : pickedId);
   const section =
     song.sections.find((s) => s.id === sectionId) ?? song.sections[0]!;
+  const scopeFollowing =
+    follow && !!playing && !!playScope && playing.id === section.id;
+  const pickedOrPlayScope: PatternScope = scopeFollowing ? playScope! : pickedScope;
   // 1마디 섹션은 첫 마디 = 마지막 마디이고 엔진은 last를 먼저 쓴다. 화면도 같은 규칙으로 맞춘다
   const scope: PatternScope =
     section.bars === 1 && pickedOrPlayScope === "first" ? "last" : pickedOrPlayScope;
+  const following = sectionFollowing || scopeFollowing;
 
   // 재생이 시작되면 다시 따라가기. 멈추면 격자가 예전 선택으로 튀지 않게 마지막으로 보던 곳에 머문다
   const shown = useRef({ id: section.id, scope });

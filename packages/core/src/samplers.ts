@@ -54,7 +54,11 @@ const BASS_RR = 4;
 /** 노트는 E1~D#2(41~78Hz)라 노트북 스피커로는 안 들리고 샘플 범위(B1~)보다도 낮다.
  *  재생 때만 한 옥타브 올린다 (곡 데이터·MIDI 내보내기는 그대로). */
 const BASS_PLAY_OCTAVE = 1;
-const BASS_GAIN_DB = 3;
+const BASS_GAIN_DB = 1;
+/** 새 음 시작을 아주 짧게 페이드인해 클릭(찢어지는 소리)을 막는다 */
+const BASS_FADE_IN = 0.004;
+/** 이전 음을 줄이는 시간. 너무 짧으면(예: 0.02초) 새 음과 겹치는 순간 진폭이 커져 찢어지는 소리가 난다 */
+const BASS_FADE_OUT = 0.04;
 
 export function createBassSampler(baseUrl: string, fallback: TrackInstrument): Loadable {
   const urls: Record<string, string> = {};
@@ -83,17 +87,21 @@ export function createBassSampler(baseUrl: string, fallback: TrackInstrument): L
         lastRr = (lastRr % BASS_RR) + 1;
         const src = new Tone.ToneBufferSource(buffers.get(`${BASS_NOTES[idx]}_${lastRr}`));
         src.playbackRate.value = 2 ** ((midi - sampleMidi[idx]!) / 12);
-        const gain = new Tone.Gain(Tone.dbToGain(BASS_GAIN_DB) * (0.55 + 0.45 * e.velocity));
+        const peak = Tone.dbToGain(BASS_GAIN_DB) * (0.55 + 0.45 * e.velocity);
+        const gain = new Tone.Gain(0);
         src.connect(gain);
         gain.connect(out);
-        // 단음 악기: 새 음이 오면 앞 음을 짧게 줄여 끊는다
+        // 새 음은 살짝 페이드인해서 시작한다 (클릭·찢어지는 소리 방지)
+        gain.gain.setValueAtTime(0, time);
+        gain.gain.linearRampToValueAtTime(peak, time + BASS_FADE_IN);
+        // 단음 악기: 새 음이 오면 앞 음을 줄여 끊는다 (너무 급하게 줄이면 겹치는 순간 소리가 커진다)
         if (current) {
           current.gain.gain.cancelScheduledValues(time);
-          current.gain.gain.setTargetAtTime(0, time, 0.02);
-          current.src.stop(time + 0.15);
+          current.gain.gain.setTargetAtTime(0, time, BASS_FADE_OUT);
+          current.src.stop(time + BASS_FADE_OUT * 4);
         }
         // 음 길이가 끝나면 릴리스
-        gain.gain.setValueAtTime(gain.gain.value, time + dur);
+        gain.gain.setValueAtTime(peak, time + dur);
         gain.gain.setTargetAtTime(0, time + dur, 0.06);
         src.start(time);
         src.stop(time + dur + 0.4);

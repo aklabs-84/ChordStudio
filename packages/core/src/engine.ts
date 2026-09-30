@@ -90,10 +90,10 @@ export function createEngine(options: EngineOptions = {}): Engine {
     transport.loopStart = 0;
     transport.loopEnd = ticks(totalBeats);
     if (!loop) {
-      transport.schedule((time) => {
+      transport.schedule(() => {
         transport.stop();
         playing = false;
-        Tone.getDraw().schedule(() => options.onEnded?.(), time);
+        options.onEnded?.();
       }, ticks(totalBeats));
     }
   }

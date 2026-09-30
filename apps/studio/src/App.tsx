@@ -56,6 +56,7 @@ export function App() {
   const [song, setSong] = useState<Song>(() => loadSong() ?? generateSong({ genre: "pop", seed: 1 }));
   const [view, setView] = useState<"studio" | "wizard" | "lesson">("studio");
   const [playing, setPlaying] = useState(false);
+  const [loop, setLoop] = useState(true);
   const [humanize, setHumanize] = useState(true);
   const [playhead, setPlayhead] = useState<Playhead | null>(null);
   const [samplesReady, setSamplesReady] = useState(false);
@@ -101,6 +102,10 @@ export function App() {
   useEffect(() => {
     engineRef.current?.setHumanize(humanize);
   }, [humanize]);
+
+  useEffect(() => {
+    engineRef.current?.setLoop(loop);
+  }, [loop]);
 
   // 자동저장 (슬라이더를 끄는 동안 매번 쓰지 않도록 잠깐 모았다가)
   useEffect(() => {
@@ -290,6 +295,22 @@ export function App() {
               <span className="text-xs text-slate-500" role="status">
                 {samplesReady ? "샘플 준비됨" : "샘플 로딩 중… (그 전에는 신스로 재생)"}
               </span>
+              <div className="flex gap-1 rounded-lg bg-slate-100 p-1" role="group" aria-label="재생 방식">
+                <button
+                  onClick={() => setLoop(true)}
+                  aria-pressed={loop}
+                  className={`rounded-md px-2.5 py-1 text-xs font-medium ${loop ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-white hover:text-slate-900"}`}
+                >
+                  반복재생
+                </button>
+                <button
+                  onClick={() => setLoop(false)}
+                  aria-pressed={!loop}
+                  className={`rounded-md px-2.5 py-1 text-xs font-medium ${!loop ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-white hover:text-slate-900"}`}
+                >
+                  한 번만
+                </button>
+              </div>
               <button onClick={toggle} className={`${btn} text-white ${playing ? "bg-rose-500 hover:bg-rose-400" : "bg-emerald-500 hover:bg-emerald-400"} min-w-24`}>
                 {playing ? "■ 정지" : "▶ 재생"}
               </button>
@@ -307,6 +328,8 @@ export function App() {
           playhead={playhead}
           playing={playing}
           onToggle={() => void toggle()}
+          loop={loop}
+          onSetLoop={setLoop}
           onSectionFocus={setPlayScopeId}
           onRegenerate={regenerate}
           onPatchMeta={patchMeta}

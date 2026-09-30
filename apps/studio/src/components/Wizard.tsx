@@ -13,6 +13,8 @@ interface Props {
   playhead: Playhead | null;
   playing: boolean;
   onToggle: () => void;
+  loop: boolean;
+  onSetLoop: (loop: boolean) => void;
   /** 섹션 편집 단계에 들어오고 나갈 때 알려준다: 재생을 그 섹션 하나만 반복하도록 좁히기 위함 */
   onSectionFocus: (sectionId: string | null) => void;
   onRegenerate: (opts: { genre: Genre; seed: number; key?: string; bpm?: number }) => void;
@@ -100,6 +102,8 @@ export function Wizard({
   playhead,
   playing,
   onToggle,
+  loop,
+  onSetLoop,
   onSectionFocus,
   onRegenerate,
   onPatchMeta,
@@ -200,9 +204,27 @@ export function Wizard({
             </span>
           )}
         </span>
-        <button onClick={onToggle} className={`${btn} ${playing ? "bg-rose-500" : "bg-emerald-500"} min-w-24 text-white hover:brightness-95`}>
-          {playing ? "■ 정지" : "▶ 재생"}
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1 rounded-lg bg-slate-100 p-1" role="group" aria-label="재생 방식">
+            <button
+              onClick={() => onSetLoop(true)}
+              aria-pressed={loop}
+              className={`rounded-md px-2.5 py-1 text-xs font-medium ${loop ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-white hover:text-slate-900"}`}
+            >
+              반복재생
+            </button>
+            <button
+              onClick={() => onSetLoop(false)}
+              aria-pressed={!loop}
+              className={`rounded-md px-2.5 py-1 text-xs font-medium ${!loop ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-white hover:text-slate-900"}`}
+            >
+              한 번만
+            </button>
+          </div>
+          <button onClick={onToggle} className={`${btn} ${playing ? "bg-rose-500" : "bg-emerald-500"} min-w-24 text-white hover:brightness-95`}>
+            {playing ? "■ 정지" : "▶ 재생"}
+          </button>
+        </div>
       </div>
 
       {isAiStep && (
