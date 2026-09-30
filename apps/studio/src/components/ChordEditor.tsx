@@ -1,6 +1,6 @@
 // 섹션별 코드 카드. 카드를 누르면 아래에 편집 줄(기호·박자·추가·삭제)이 열린다.
 import { memo, useEffect, useRef, useState } from "react";
-import { addChord, isValidChord, removeChord, setChordSymbol, shiftChordBeats, type Song } from "@chord-studio/core";
+import { addChord, isValidChord, removeChord, setChordSymbol, shiftChordBeats, splitChord, type Song } from "@chord-studio/core";
 
 interface Props {
   song: Song;
@@ -113,6 +113,14 @@ export const ChordEditor = memo(function ChordEditor({ song, active: playing, on
               </span>
               <button className={small} onClick={() => onChange((s0) => addChord(s0, s.id, sel.index, chord.symbol))}>
                 뒤에 추가
+              </button>
+              <button
+                className={small}
+                disabled={chord.beats < 2}
+                title="이 코드를 절반씩 두 코드로 나눕니다 (섹션 길이는 그대로)"
+                onClick={() => onChange((s0) => splitChord(s0, s.id, sel.index))}
+              >
+                쪼개기
               </button>
               <button
                 className={`${small} text-rose-600`}

@@ -86,6 +86,19 @@ export function addChord(song: Song, sectionId: string, index: number, symbol: s
   }));
 }
 
+/** 코드 하나를 절반씩(홀수면 앞쪽 반올림) 같은 심볼의 두 코드로 나눈다. 섹션 길이·다른 코드는 그대로 둔다. 1박짜리는 나눌 수 없다. */
+export function splitChord(song: Song, sectionId: string, index: number): Song {
+  return withSection(song, sectionId, (s) => {
+    const chord = s.chords[index];
+    if (!chord || chord.beats < 2) return null;
+    const firstBeats = Math.ceil(chord.beats / 2);
+    const secondBeats = chord.beats - firstBeats;
+    const chords = s.chords.slice();
+    chords.splice(index, 1, { symbol: chord.symbol, beats: firstBeats }, { symbol: chord.symbol, beats: secondBeats });
+    return { ...s, chords };
+  });
+}
+
 /** 코드를 지운다. 박자 합이 마디에 안 맞으면 마지막 코드를 늘려 맞춘다. 마지막 하나는 지울 수 없다. */
 export function removeChord(song: Song, sectionId: string, index: number): Song {
   return withSection(song, sectionId, (s) => {
