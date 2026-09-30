@@ -27,6 +27,7 @@ import {
 import { createEngine, type Engine } from "@chord-studio/core/engine";
 import { ArrangementEditor } from "./components/ArrangementEditor";
 import { ChordEditor } from "./components/ChordEditor";
+import { ChordInputView } from "./components/ChordInputView";
 import { Credits } from "./components/Credits";
 import { LessonPanel } from "./components/LessonPanel";
 import { PatternGrid } from "./components/PatternGrid";
@@ -57,7 +58,7 @@ export function App() {
   const engineRef = useRef<Engine | null>(null);
   // 저장된 곡이 있으면 이어서, 없으면 팝 시드 1로 시작
   const [song, setSong] = useState<Song>(() => loadSong() ?? generateSong({ genre: "pop", seed: 1 }));
-  const [view, setView] = useState<"studio" | "wizard" | "lesson">("studio");
+  const [view, setView] = useState<"studio" | "wizard" | "lesson" | "chordInput">("studio");
   const [playing, setPlaying] = useState(false);
   const [loop, setLoop] = useState(true);
   const [humanize, setHumanize] = useState(true);
@@ -347,6 +348,14 @@ export function App() {
             >
               가이드
             </button>
+            <button
+              role="tab"
+              aria-selected={view === "chordInput"}
+              onClick={() => setView("chordInput")}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium ${view === "chordInput" ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-white hover:text-slate-900"}`}
+            >
+              코드 입력
+            </button>
           </div>
           {view === "studio" && (
             <>
@@ -424,6 +433,16 @@ export function App() {
           onExportJson={exportJson}
           onCopyLink={() => void copyLink()}
           linkNote={linkNote}
+        />
+      )}
+
+      {view === "chordInput" && (
+        <ChordInputView
+          song={song}
+          onApply={(newSong) => {
+            applyEdit(() => newSong);
+          }}
+          onNavigateToStudio={() => setView("studio")}
         />
       )}
 
