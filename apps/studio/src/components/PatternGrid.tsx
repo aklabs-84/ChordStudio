@@ -237,6 +237,36 @@ export function PatternGrid({ song, original, playhead, onChange, forceSectionId
 
   const changed = resetSection(song, original, section.id) !== song;
 
+  // 비트·악기 섹션 제목 옆에 넣을 마디 종류 미니 네비게이션. 위 탭과 같은 scope 상태를 공유한다.
+  const scopeIdx = SCOPES.findIndex((sc) => sc.id === scope);
+  const stepScope = (dir: 1 | -1) =>
+    setScope(SCOPES[(scopeIdx + dir + SCOPES.length) % SCOPES.length]!.id);
+  const renderScopeNav = () => (
+    <div className="mb-2 flex items-center gap-1.5 text-xs" role="group" aria-label="마디 종류 빠른 전환">
+      <button
+        onClick={() => stepScope(-1)}
+        aria-label="이전 마디 종류"
+        className="rounded-md border border-slate-200 bg-white px-2 py-1 hover:bg-slate-50"
+      >
+        ◀
+      </button>
+      <span
+        className={`rounded-md px-2 py-1 font-semibold ${
+          following ? "bg-amber-400 text-slate-900" : "bg-indigo-50 text-indigo-700"
+        }`}
+      >
+        {following ? `▶ 재생 중 · ${SCOPE_NAME[scope]}` : SCOPE_NAME[scope]}
+      </span>
+      <button
+        onClick={() => stepScope(1)}
+        aria-label="다음 마디 종류"
+        className="rounded-md border border-slate-200 bg-white px-2 py-1 hover:bg-slate-50"
+      >
+        ▶
+      </button>
+    </div>
+  );
+
   const clearVariant = () => {
     if (scope === "main") return;
     const all: PatternRef[] = [
@@ -338,6 +368,7 @@ export function PatternGrid({ song, original, playhead, onChange, forceSectionId
         <section className={card} aria-label="비트 패턴">
           <details className="group space-y-1">
           <summary className={summary}>🥁 비트 (드럼)</summary>
+          {renderScopeNav()}
           <div className="mb-1">
             <button
               onClick={() => onChange((s) => setDrumsMuted(s, section.id, !drumsAllMuted))}
@@ -367,6 +398,7 @@ export function PatternGrid({ song, original, playhead, onChange, forceSectionId
         <section className={card} aria-label="악기 패턴">
           <details className="group space-y-4">
           <summary className={summary}>🎹 악기 (피아노·베이스·스트링)</summary>
+          {renderScopeNav()}
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex flex-wrap gap-1" role="group" aria-label="피아노 스타일">
