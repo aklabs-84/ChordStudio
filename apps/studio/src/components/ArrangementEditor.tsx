@@ -1,5 +1,6 @@
 // 재생 순서 칩. 칩을 누르면 아래에 이동(◀ ▶)·삭제 줄이 열리고, 맨 끝의 "+ 섹션"으로 섹션을 이어 붙인다.
-import { memo, useEffect, useState } from "react";
+// 칩은 드래그(마우스·터치 공용 Pointer Events)로도 순서를 바꿀 수 있다.
+import { memo, useEffect, useRef, useState } from "react";
 import {
   appendArrangementItem,
   moveArrangementItem,
@@ -23,6 +24,67 @@ export const ArrangementEditor = memo(function ArrangementEditor({ song, activeI
   const [sel, setSel] = useState<number | null>(null);
   const nameOf = (id: string) => song.sections.find((s) => s.id === id)?.name ?? id;
   const last = song.arrangement.length - 1;
+
+  // 드래그 재정렬 상태. dragIndex/dragOverIndex는 드래그 중일 때만 값을 가져 칩 스타일(반투명·강조 테두리)에 쓰인다.
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const pointerOrigin = useRef<{ x: number; y: number } | null>(null);
+  const originIndex = useRef<number | null>(null);
+  const isDragging = useRef(false);
+  const suppressClick = useRef(false);
+
+  const handlePointerDown = (e: React.PointerEvent, i: number) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    pointerOrigin.current = { x: e.clientX, y: e.clientY };
+    originIndex.current = i;
+    isDragging.current = false;
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!pointerOrigin.current || originIndex.current === null) return;
+    const dx = e.clientX - pointerOrigin.current.x;
+    const dy = e.clientY - pointerOrigin.current.y;
+    if (!isDragging.current) {
+      if (Math.hypot(dx, dy) < 6) return;
+      isDragging.current = true;
+      suppressClick.current = true;
+      setDragIndex(originIndex.current);
+      try {
+        (e.target as Element).setPointerCapture(e.pointerId);
+      } catch {
+        // 포인터 캡처를 지원하지 않는 환경이면 무시하고 elementFromPoint 판정만으로 진행한다
+      }
+    }
+    e.preventDefault();
+    const el = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>("[data-arr-index]");
+    setDragOverIndex(el ? Number(el.dataset.arrIndex) : null);
+  };
+
+  const endDrag = (commit: boolean) => {
+    if (commit && isDragging.current && originIndex.current !== null && dragOverIndex !== null && dragOverIndex !== originIndex.current) {
+      const from = originIndex.current;
+      const to = dragOverIndex;
+      onChange((s) => moveArrangementItem(s, from, to - from));
+      setSel((cur) => {
+        if (cur === null) return cur;
+        if (cur === from) return to;
+        if (from < cur && cur <= to) return cur - 1;
+        if (to <= cur && cur < from) return cur + 1;
+        return cur;
+      });
+    }
+    const wasDragging = isDragging.current;
+    pointerOrigin.current = null;
+    originIndex.current = null;
+    isDragging.current = false;
+    setDragIndex(null);
+    setDragOverIndex(null);
+    if (wasDragging) requestAnimationFrame(() => (suppressClick.current = false));
+    else suppressClick.current = false;
+  };
+
+  const handlePointerUp = () => endDrag(true);
+  const handlePointerCancel = () => endDrag(false);
 
   // 순서가 줄어 선택한 칸이 없어지면 선택을 푼다
   useEffect(() => {
@@ -75,12 +137,22 @@ export const ArrangementEditor = memo(function ArrangementEditor({ song, activeI
           return (
             <li key={i}>
               <button
-                onClick={() => setSel(selected ? null : i)}
+                data-arr-index={i}
+                onClick={() => {
+                  if (suppressClick.current) return;
+                  setSel(selected ? null : i);
+                }}
+                onPointerDown={(e) => handlePointerDown(e, i)}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerCancel}
                 aria-pressed={selected}
-                aria-label={`${i + 1}번째 ${nameOf(id)} 편집`}
-                className={`rounded px-2 py-1 ${
+                aria-label={`${i + 1}번째 ${nameOf(id)} 편집 (드래그로 순서 변경 가능)`}
+                className={`touch-none rounded px-2 py-1 ${
                   active ? "bg-amber-400 font-bold text-slate-900" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                } ${selected ? "outline outline-2 outline-indigo-500" : ""}`}
+                } ${selected ? "outline outline-2 outline-indigo-500" : ""} ${dragIndex === i ? "opacity-40" : ""} ${
+                  dragOverIndex === i && dragIndex !== i ? "ring-2 ring-indigo-400" : ""
+                }`}
               >
                 {nameOf(id)}
               </button>

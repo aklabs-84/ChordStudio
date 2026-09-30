@@ -107,6 +107,13 @@ export function removeChord(song: Song, sectionId: string, index: number): Song 
   });
 }
 
+/** 곡 제목을 바꾼다. 앞뒤 공백을 지우고, 빈 문자열이거나 글자수 상한을 넘으면 무시한다. */
+export function setSongTitle(song: Song, title: string): Song {
+  const next = title.trim();
+  if (next.length === 0 || next.length > SONG_LIMITS.textChars || next === song.meta.title) return song;
+  return { ...song, meta: { ...song.meta, title: next } };
+}
+
 /** 곡 전체(모든 섹션의 코드)를 새 조성으로 전조한다. 패턴·구조·믹서는 그대로 유지. 같은 조성이면 그대로 둔다. */
 export function transposeSong(song: Song, newKey: string): Song {
   if (newKey === song.meta.key) return song;

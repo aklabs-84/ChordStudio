@@ -13,6 +13,7 @@ import {
   parseSongJson,
   restoreStructure,
   serializeSong,
+  setSongTitle,
   songFromShareHash,
   songToMidi,
   songToShareHash,
@@ -68,6 +69,10 @@ export function App() {
   const [undo, setUndo] = useState<Pick<Song, "sections" | "arrangement"> | null>(null);
   // 위자드에서 특정 섹션을 편집 중일 때만 채워짐: 재생을 그 섹션 하나만 반복하도록 좁힌다
   const [playScopeId, setPlayScopeId] = useState<string | null>(null);
+  // 곡 제목 인라인 편집: 누르면 입력창으로 바뀐다
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+  const cancellingTitle = useRef(false);
   const songRef = useRef(song);
   songRef.current = song;
 
@@ -158,6 +163,19 @@ export function App() {
     setUndo({ sections: before.sections, arrangement: before.arrangement });
     setSong(after);
   }, []);
+
+  const startEditTitle = () => {
+    setTitleDraft(song.meta.title);
+    setEditingTitle(true);
+  };
+  const commitTitle = () => {
+    if (cancellingTitle.current) {
+      cancellingTitle.current = false;
+      return;
+    }
+    applyEdit((s) => setSongTitle(s, titleDraft));
+    setEditingTitle(false);
+  };
 
   const undoEdit = () => {
     if (!undo) return;
@@ -586,7 +604,34 @@ export function App() {
           <section className={`${card} space-y-4`} aria-label="곡 구조">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
-                <p className="font-semibold text-slate-900">{song.meta.title}</p>
+                {editingTitle ? (
+                  <input
+                    autoFocus
+                    value={titleDraft}
+                    onChange={(e) => setTitleDraft(e.target.value)}
+                    onBlur={commitTitle}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.currentTarget.blur();
+                      if (e.key === "Escape") {
+                        cancellingTitle.current = true;
+                        setEditingTitle(false);
+                        e.currentTarget.blur();
+                      }
+                    }}
+                    aria-label="곡 제목"
+                    maxLength={100}
+                    className="rounded-md border border-indigo-300 px-1.5 py-0.5 font-semibold text-slate-900"
+                  />
+                ) : (
+                  <button
+                    onClick={startEditTitle}
+                    aria-label="곡 제목 수정"
+                    title="눌러서 제목 수정"
+                    className="rounded px-1 font-semibold text-slate-900 hover:bg-slate-50"
+                  >
+                    {song.meta.title}
+                  </button>
+                )}
                 <div className="flex items-center gap-1 text-xs text-slate-500" role="group" aria-label="곡 번호">
                   <span>곡 #{seed}</span>
                   <button
