@@ -3,7 +3,19 @@
 // 실제 코드 진행·패턴 편집·MIDI 내보내기 로직은 전부 App.tsx/packages/core를 그대로 재사용하고,
 // 이 파일은 "한 번에 하나씩 보여주는" 레이아웃만 담당한다.
 import { useEffect, useMemo, useState } from "react";
-import { addSection, GENRES, PRESETS, TRACK_IDS, type Genre, type MixerChannel, type Playhead, type Song, type TrackId } from "@chord-studio/core";
+import {
+  addSection,
+  appendArrangementItem,
+  GENRES,
+  PRESETS,
+  setArrangementRepeat,
+  TRACK_IDS,
+  type Genre,
+  type MixerChannel,
+  type Playhead,
+  type Song,
+  type TrackId,
+} from "@chord-studio/core";
 import { ChordEditor } from "./ChordEditor";
 import { PatternGrid } from "./PatternGrid";
 
@@ -80,7 +92,21 @@ function buildPrompt(mood: Mood | undefined): string {
 function buildSectionPrompt(song: Song, section: Song["sections"][number]): string {
   const blurb = SECTION_BLURB[section.id];
   const role = blurb ? blurb.replace(/^[^:]+:\s*/, "") : "새로 추가한 구간";
-  return `나는 지금 ${PRESETS[song.meta.genre].label} 장르, 조성 ${song.meta.key}, BPM ${song.meta.bpm}으로 곡을 만들고 있어. 지금 만들고 있는 부분은 "${section.name}"(${role}), 총 ${section.bars}마디야. 이 부분에 어울리는 코드 진행과 리듬(피아노 패턴·드럼 강조) 아이디어를 추천해줘. 음악을 전공하지 않은 사람도 이해할 수 있게 쉽게 설명해줘.`;
+  return `나는 지금 ${PRESETS[song.meta.genre].label} 장르, 조성 ${song.meta.key}, BPM ${song.meta.bpm}으로 곡을 만들고 있어. 지금 만들고 있는 부분은 "${section.name}"(${role}), 총 ${section.bars}마디야.
+
+이 앱은 1마디를 16칸(16분음표 한 칸씩)으로 나눈 스텝 시퀀서라서, 문장으로 된 설명보다 "몇 번 칸에 무엇을 찍는지"로 답을 줘야 내가 바로 옮겨 찍을 수 있어. 칸마다 세기는 꺼짐·보통·세게 중 하나이고, 아래 줄들을 각각 따로 입력해:
+- 드럼: 킥·스네어·림샷·하이햇·오픈햇·하이탐·로우탐·라이드·크래시 (9줄)
+- 피아노: 1줄 (스타일은 코드/아르페지오 ↑/아르페지오 ↑↓/브로큰 중 하나 선택)
+- 베이스: 1줄
+
+코드 진행을 먼저 알려주고, 반복되는 기본 1마디 패턴을 아래 형식 그대로 악기별 "칸 번호: 세기" 목록으로 줘. 예시:
+킥: 1번 세게, 9번 보통
+스네어: 5번 세게, 13번 세게
+하이햇: 1,3,5,7,9,11,13,15번 보통
+피아노(코드 스타일): 1번 세게
+베이스: 1번 세게, 9번 보통
+
+음악을 전공하지 않은 사람도 그대로 격자에 옮겨 찍을 수 있게 칸 번호와 세기만 정확히 알려주고, 다른 설명은 최소화해줘.`;
 }
 
 /** 클립보드 복사 등 짧은 피드백을 화면 하단에 잠깐 띄운다 */
@@ -95,13 +121,27 @@ function Toast({ message }: { message: string }) {
   );
 }
 
-/** 곡 구조(재생 순서 우선, 없는 섹션은 뒤로) 순서로 중복 없이 섹션을 나열 */
+/** 레슨 단계 순서는 "만들기"의 재생 순서(반복·재배치 등)와 상관없이 항상 이 표준 구조를 따른다 */
+const CANONICAL_SECTION_ORDER = ["Intro", "A", "PreChorus", "B", "Outro"];
+
+/** 표준 구조(인트로~아웃트로) 순서로 정렬하고, 표준에 없는 id(직접 추가한 섹션)는 뒤에 원래 순서대로 붙인다 */
 function orderedSections(song: Song) {
-  const ids = [
-    ...new Set(song.arrangement),
-    ...song.sections.map((s) => s.id).filter((id) => !song.arrangement.includes(id)),
-  ];
-  return ids.flatMap((id) => song.sections.filter((s) => s.id === id));
+  const rank = (id: string) => {
+    const i = CANONICAL_SECTION_ORDER.indexOf(id);
+    return i === -1 ? CANONICAL_SECTION_ORDER.length : i;
+  };
+  return [...song.sections].sort((a, b) => rank(a.id) - rank(b.id));
+}
+
+/** 재생 순서에서 이 섹션 id가 연달아 나오는 구간(반복 블록)의 시작 칸과 길이. 없으면 null */
+function arrangementBlock(song: Song, sectionId: string): { start: number; count: number } | null {
+  const idx = song.arrangement.indexOf(sectionId);
+  if (idx === -1) return null;
+  let start = idx;
+  while (start > 0 && song.arrangement[start - 1] === sectionId) start--;
+  let end = idx;
+  while (end < song.arrangement.length - 1 && song.arrangement[end + 1] === sectionId) end++;
+  return { start, count: end - start + 1 };
 }
 
 export function Wizard({
@@ -172,6 +212,19 @@ export function Wizard({
     }
   };
   const copyPrompt = () => copyText(prompt);
+
+  const sectionRepeatCount = currentSection ? arrangementBlock(song, currentSection.id)?.count ?? 0 : 0;
+  const setSectionRepeat = (count: number) => {
+    if (!currentSection || count < 1) return;
+    const sectionId = currentSection.id;
+    onChange((s) => {
+      const block = arrangementBlock(s, sectionId);
+      if (block) return setArrangementRepeat(s, block.start, count);
+      let next = s;
+      for (let i = 0; i < count; i++) next = appendArrangementItem(next, sectionId);
+      return next;
+    });
+  };
 
   const addNewSection = () => {
     const name = window.prompt("새 섹션 이름을 입력하세요 (마지막 섹션을 복사해서 시작합니다)", `섹션 ${sections.length + 1}`);
@@ -396,6 +449,28 @@ export function Wizard({
           <h2 className="text-lg font-bold sm:text-xl">
             {clampedStep + 1}. {currentSection.name} 편집 ({currentSection.bars}마디)
           </h2>
+
+          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600 sm:text-base">
+            <span>반복</span>
+            <button
+              className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+              disabled={sectionRepeatCount <= 1}
+              onClick={() => setSectionRepeat(sectionRepeatCount - 1)}
+              aria-label="반복 횟수 줄이기"
+            >
+              −
+            </button>
+            <span className="w-5 text-center font-semibold text-slate-800">{sectionRepeatCount}</span>
+            <button
+              className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-sm text-slate-700 hover:bg-slate-50"
+              onClick={() => setSectionRepeat(sectionRepeatCount + 1)}
+              aria-label="반복 횟수 늘리기"
+            >
+              +
+            </button>
+            <span className="text-xs text-slate-400">이 섹션이 곡 전체 재생 순서에서 반복되는 횟수예요</span>
+          </div>
+
           {SECTION_BLURB[currentSection.id] && (
             <p className="rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-700 sm:text-base">
               {SECTION_BLURB[currentSection.id]}
@@ -407,7 +482,7 @@ export function Wizard({
             <textarea
               readOnly
               value={buildSectionPrompt(song, currentSection)}
-              rows={3}
+              rows={9}
               className="w-full resize-none rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-700 sm:p-3 sm:text-sm sm:leading-relaxed"
             />
             <button onClick={() => void copyText(buildSectionPrompt(song, currentSection))} className={btnGhost}>

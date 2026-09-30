@@ -3,7 +3,9 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
   DRUM_LANES,
+  PRESETS,
   STEPS_PER_BAR,
+  applyPatternPreset,
   clearPatternVariant,
   cycleStep,
   getStepPattern,
@@ -16,6 +18,7 @@ import {
   stepLevel,
   stepsOf,
   type DrumLane,
+  type Intensity,
   type PatternRef,
   type PatternScope,
   type PianoStyle,
@@ -284,6 +287,17 @@ export function PatternGrid({ song, original, playhead, onChange, forceSectionId
     );
   };
 
+  // 장르 프리셋(가볍게/꽉 차게)을 통째로 적용. 같은 버튼을 다시 누르면 다음 조합으로 순환한다.
+  const [presetPick, setPresetPick] = useState<Record<string, number>>({});
+  const applyPreset = (intensity: Intensity) => {
+    const key = `${section.id}:${intensity}`;
+    const variants = PRESETS[song.meta.genre].variants[intensity];
+    const nextIndex = ((presetPick[key] ?? -1) + 1) % variants.length;
+    setPresetPick((m) => ({ ...m, [key]: nextIndex }));
+    onChange((s) => applyPatternPreset(s, section.id, song.meta.genre, intensity, nextIndex));
+  };
+  const presetVariantCount = (intensity: Intensity) => PRESETS[song.meta.genre].variants[intensity].length;
+
   return (
     <div className="space-y-4">
       <section className={`${card} space-y-3`} aria-label="패턴 편집">
@@ -306,6 +320,22 @@ export function PatternGrid({ song, original, playhead, onChange, forceSectionId
         >
           {section.name} 원래대로
         </button>
+        <span className="flex flex-wrap items-center gap-1" role="group" aria-label="패턴 프리셋 적용">
+          <button
+            onClick={() => applyPreset("low")}
+            className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 hover:bg-slate-50"
+            title="드럼·피아노·베이스를 이 장르의 담백한 조합으로 한 번에 채웁니다 (다시 누르면 다른 조합)"
+          >
+            🌱 심플하게{presetVariantCount("low") > 1 ? " (다시 누르면 다른 조합)" : ""}
+          </button>
+          <button
+            onClick={() => applyPreset("high")}
+            className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 hover:bg-slate-50"
+            title="드럼·피아노·베이스를 이 장르의 꽉 찬 조합으로 한 번에 채웁니다 (다시 누르면 다른 조합)"
+          >
+            🔥 풍성하게{presetVariantCount("high") > 1 ? " (다시 누르면 다른 조합)" : ""}
+          </button>
+        </span>
         {playhead && !follow && (
             <button
               onClick={() => setFollow(true)}

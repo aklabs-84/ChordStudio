@@ -51,6 +51,19 @@ export const ArrangementEditor = memo(function ArrangementEditor({ song, activeI
     setSel(blockStart); // 블록이 늘고 줄어도 블록 시작 칩을 계속 선택 상태로 유지
   };
 
+  // 이 칩을 지우면 해당 섹션이 재생 순서 어디에도 안 남는 "마지막 사용"인 경우, 물어보고 섹션 자체도 함께 삭제한다.
+  const deleteSelected = () => {
+    if (sel === null) return;
+    const sectionId = song.arrangement[sel]!;
+    const isLastUse = song.arrangement.filter((id) => id === sectionId).length === 1;
+    if (isLastUse) {
+      if (!window.confirm(`"${nameOf(sectionId)}" 섹션이 재생 순서에서 완전히 빠지고, 섹션 자체도 삭제됩니다. 삭제할까요?`)) return;
+      onChange((s) => removeSection(removeArrangementItem(s, sel), sectionId));
+    } else {
+      onChange((s) => removeArrangementItem(s, sel));
+    }
+  };
+
   const usedSectionIds = new Set(song.arrangement);
 
   return (
@@ -124,11 +137,7 @@ export const ArrangementEditor = memo(function ArrangementEditor({ song, activeI
               +
             </button>
           </span>
-          <button
-            className={`${small} text-rose-600`}
-            disabled={song.arrangement.length <= 1}
-            onClick={() => onChange((s) => removeArrangementItem(s, sel))}
-          >
+          <button className={`${small} text-rose-600`} disabled={song.arrangement.length <= 1} onClick={deleteSelected}>
             삭제
           </button>
         </div>

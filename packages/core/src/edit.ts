@@ -1,6 +1,7 @@
 // 곡 편집용 순수 함수. 원본을 바꾸지 않고 새 Song을 돌려주며, 결과는 항상 validateSong을 통과한다.
 // 할 수 없는 편집(잘못된 코드, 범위 밖 박자 등)은 같은 song을 그대로 돌려준다.
 import { isValidChord, keyUsesFlats, semitonesBetweenKeys, transposeSymbol } from "./theory";
+import { PRESETS, type Intensity } from "./patterns";
 import {
   BEATS_PER_BAR,
   SONG_LIMITS,
@@ -8,6 +9,7 @@ import {
   resolveBarPattern,
   type ChordSlot,
   type DrumLane,
+  type Genre,
   type PianoStyle,
   type Section,
   type Song,
@@ -276,6 +278,17 @@ export function setDrumsMuted(song: Song, sectionId: string, muted: boolean): So
     if (lanes.length === 0) return null;
     return lanes.reduce((acc, [lane]) => setPatternMuted({ ...song, sections: [acc] }, sectionId, { track: "drums", lane: lane as DrumLane }, muted).sections[0]!, s);
   });
+}
+
+/**
+ * 섹션의 드럼·피아노·베이스·스트링을 장르 프리셋(low=가볍게/high=꽉 차게)의 한 조합으로 통째로 바꾼다.
+ * 코드·마디 수는 그대로 두고 패턴만 바꿔, 맨땅에서 16칸씩 채우는 대신 바로 쓸 수 있는 시작점을 준다.
+ * variantIndex가 그 장르·인텐시티의 조합 개수를 벗어나면 무시한다.
+ */
+export function applyPatternPreset(song: Song, sectionId: string, genre: Genre, intensity: Intensity, variantIndex: number): Song {
+  const variant = PRESETS[genre].variants[intensity][variantIndex];
+  if (!variant) return song;
+  return capped(song, withSection(song, sectionId, (s) => ({ ...s, tracks: structuredClone(variant) })));
 }
 
 /** 섹션에 스트링 패드를 넣거나 뺀다. */
