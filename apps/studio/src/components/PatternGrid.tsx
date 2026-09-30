@@ -92,24 +92,80 @@ const tab = (on: boolean) =>
 interface CellProps {
   label: string;
   step: number;
+  subStep: number;
   level: 0 | 1 | 2;
   active: boolean;
   onStep: (step: number) => void;
 }
 
 // 칸 하나. 재생 중 16분음표마다 표시가 옮겨 가므로, 값이 안 바뀐 칸은 다시 그리지 않도록 memo로 막는다.
-const Cell = memo(function Cell({ label, step, level, active, onStep }: CellProps) {
+const Cell = memo(function Cell({ label, step, subStep, level, active, onStep }: CellProps) {
+  const isDownbeat = subStep === 0;
   return (
     <button
       onClick={() => onStep(step)}
       aria-label={`${label} ${step + 1}번 칸 ${LEVEL_NAME[level]}`}
       aria-pressed={level > 0}
-      className={`h-8 rounded-sm sm:h-7 ${LEVEL_STYLE[level]} ${step % 4 === 0 && level === 0 ? "brightness-125" : ""} ${
-        active ? "z-10 scale-110 outline outline-2 outline-amber-300 brightness-150" : ""
-      } ${step % 8 === 0 ? (step > 0 ? "sm:ml-1" : "") : step % 4 === 0 ? "ml-1" : ""}`}
-    />
+      className={`relative flex h-8 items-center justify-center rounded-sm sm:h-7 transition-all ${
+        LEVEL_STYLE[level]
+      } ${
+        isDownbeat && level === 0 ? "border-l-2 border-slate-300" : ""
+      } ${
+        active ? "z-10 scale-105 outline outline-2 outline-amber-400 brightness-110 shadow-sm" : ""
+      }`}
+    >
+      {/* 꺼져 있을 때 정박(각 박자의 첫 번째 칸)에 은은한 앵커 닷 표시 */}
+      {isDownbeat && level === 0 && (
+        <span className="h-1.5 w-1.5 rounded-full bg-slate-400/40 pointer-events-none" />
+      )}
+      {/* 세게(level 2)일 때 미세한 센터 바 표시 */}
+      {level === 2 && (
+        <span className="h-2 w-1 rounded-full bg-white/70 pointer-events-none" />
+      )}
+    </button>
   );
 });
+
+/** 1마디 안의 4개 박자(1~4박)와 16분음표 서브스텝을 시각적으로 안내하는 헤더 */
+function BeatHeader({ activeStep }: { activeStep: number | null }) {
+  return (
+    <div className="flex items-center gap-2 pb-1.5 text-xs select-none">
+      <div className="w-16 shrink-0 text-right pr-2 font-semibold text-slate-400 text-[11px]">
+        박자
+      </div>
+      <div className="grid min-w-0 flex-1 grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2">
+        {[0, 1, 2, 3].map((b) => {
+          const isCurrentBeat = activeStep !== null && Math.floor(activeStep / 4) === b;
+          return (
+            <div
+              key={b}
+              className={`rounded-lg border px-1.5 py-1 transition-all ${
+                isCurrentBeat
+                  ? "border-amber-400 bg-amber-50/80 shadow-xs ring-1 ring-amber-300"
+                  : "border-slate-200/90 bg-slate-50/80"
+              }`}
+            >
+              <div className="flex items-center justify-between px-0.5">
+                <span className={`font-bold text-[11px] sm:text-xs ${isCurrentBeat ? "text-amber-900" : "text-slate-700"}`}>
+                  {b + 1}박
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">
+                  Beat {b + 1}
+                </span>
+              </div>
+              <div className="grid grid-cols-4 gap-0.5 pt-0.5 text-center text-[9px] sm:text-[10px] font-mono">
+                <span className={activeStep === b * 4 ? "text-amber-600 font-bold" : "text-slate-600 font-semibold"}>정박</span>
+                <span className={activeStep === b * 4 + 1 ? "text-amber-600 font-bold" : "text-slate-400"}>¼</span>
+                <span className={activeStep === b * 4 + 2 ? "text-amber-600 font-bold" : "text-slate-500 font-medium"}>½</span>
+                <span className={activeStep === b * 4 + 3 ? "text-amber-600 font-bold" : "text-slate-400"}>¾</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function Row({
   label,
@@ -144,9 +200,24 @@ function Row({
       >
         {muted ? "🔇" : "🔊"} {label}
       </button>
-      <div className={`grid min-w-0 flex-1 grid-cols-8 gap-0.5 sm:grid-cols-[repeat(16,minmax(0,1fr))] ${muted ? "opacity-30" : ""}`}>
-        {Array.from({ length: STEPS_PER_BAR }, (_, step) => (
-          <Cell key={step} label={label} step={step} level={stepLevel(values[step] ?? 0)} active={active === step} onStep={press} />
+      <div className={`grid min-w-0 flex-1 grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2 ${muted ? "opacity-30" : ""}`}>
+        {[0, 1, 2, 3].map((b) => (
+          <div key={b} className="grid grid-cols-4 gap-0.5">
+            {[0, 1, 2, 3].map((subStep) => {
+              const step = b * 4 + subStep;
+              return (
+                <Cell
+                  key={step}
+                  label={label}
+                  step={step}
+                  subStep={subStep}
+                  level={stepLevel(values[step] ?? 0)}
+                  active={active === step}
+                  onStep={press}
+                />
+              );
+            })}
+          </div>
         ))}
       </div>
     </div>
@@ -404,7 +475,7 @@ export function PatternGrid({ song, original, playhead, onChange, forceSectionId
           <details className="group space-y-1">
           <summary className={summary}>🥁 비트 (드럼)</summary>
           {renderScopeNav()}
-          <div className="mb-1">
+          <div className="mb-2 flex items-center justify-between gap-2">
             <button
               onClick={() => onChange((s) => setDrumsMuted(s, section.id, !drumsAllMuted))}
               aria-pressed={!drumsAllMuted}
@@ -412,7 +483,9 @@ export function PatternGrid({ song, original, playhead, onChange, forceSectionId
             >
               {drumsAllMuted ? "🔇 드럼 전체 켜기" : "🔊 드럼 전체 끄기"} ({section.name})
             </button>
+            <span className="text-[11px] text-slate-500 font-medium">1마디 = 4박자 (1박당 4칸)</span>
           </div>
+          <BeatHeader activeStep={activeStep} />
           {DRUM_LANES.map((lane) => {
             const ref: PatternRef = { track: "drums", lane };
             return (
@@ -434,6 +507,7 @@ export function PatternGrid({ song, original, playhead, onChange, forceSectionId
           <details className="group space-y-4">
           <summary className={summary}>🎹 악기 (피아노·베이스·스트링)</summary>
           {renderScopeNav()}
+          <BeatHeader activeStep={activeStep} />
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex flex-wrap gap-1" role="group" aria-label="피아노 스타일">
@@ -498,8 +572,8 @@ export function PatternGrid({ song, original, playhead, onChange, forceSectionId
           </div>
 
           <p className="text-xs text-slate-500">
-            칸을 누를 때마다 꺼짐 → 보통 → 세게 → 꺼짐. 격자는 "언제 치는지"이고,
-            피아노 스타일(코드/아르페지오/브로큰)은 "치는 칸에서 어떤 음을 내는지"라서
+            칸을 누를 때마다 꺼짐 → 보통 → 세게 → 꺼짐. 1마디는 4박자(1~4박)로 구성되며 각 박자는 4칸으로 세분화(정박·반의반·반박·반의반)되어 있습니다.
+            격자는 "언제 치는지"이고, 피아노 스타일(코드/아르페지오/브로큰)은 "치는 칸에서 어떤 음을 내는지"라서
             스타일을 바꿔도 격자는 그대로입니다. 줄 이름(🔊)을 누르면 그 섹션에서만 악기를
             끄고 켤 수 있고, 꺼도 칸 값은 남아 있습니다.
           </p>
