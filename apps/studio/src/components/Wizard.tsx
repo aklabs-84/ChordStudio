@@ -15,9 +15,15 @@ interface Props {
   onToggle: () => void;
   loop: boolean;
   onSetLoop: (loop: boolean) => void;
+  metronome: boolean;
+  onSetMetronome: (on: boolean) => void;
+  metronomeVolume: number;
+  onSetMetronomeVolume: (db: number) => void;
   /** 섹션 편집 단계에 들어오고 나갈 때 알려준다: 재생을 그 섹션 하나만 반복하도록 좁히기 위함 */
   onSectionFocus: (sectionId: string | null) => void;
   onRegenerate: (opts: { genre: Genre; seed: number; key?: string; bpm?: number }) => void;
+  onStartBlank: () => void;
+  onLoadDemoSong: (genre: Genre) => void;
   onPatchMeta: (patch: Partial<Song["meta"]>) => void;
   onChange: (update: (song: Song) => Song) => void;
   onUpdateChannel: (id: TrackId, patch: Partial<MixerChannel>) => void;
@@ -104,8 +110,14 @@ export function Wizard({
   onToggle,
   loop,
   onSetLoop,
+  metronome,
+  onSetMetronome,
+  metronomeVolume,
+  onSetMetronomeVolume,
   onSectionFocus,
   onRegenerate,
+  onStartBlank,
+  onLoadDemoSong,
   onPatchMeta,
   onChange,
   onUpdateChannel,
@@ -221,6 +233,26 @@ export function Wizard({
               한 번만
             </button>
           </div>
+          <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-1 text-xs" role="group" aria-label="메트로놈">
+            <button
+              onClick={() => onSetMetronome(!metronome)}
+              aria-pressed={metronome}
+              className={`rounded-md px-2.5 py-1 font-medium ${metronome ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-white hover:text-slate-900"}`}
+            >
+              🔔 메트로놈
+            </button>
+            {metronome && (
+              <input
+                type="range"
+                min={-40}
+                max={0}
+                value={metronomeVolume}
+                onChange={(e) => onSetMetronomeVolume(Number(e.target.value))}
+                aria-label="메트로놈 볼륨"
+                className="w-20 accent-indigo-600"
+              />
+            )}
+          </div>
           <button onClick={onToggle} className={`${btn} ${playing ? "bg-rose-500" : "bg-emerald-500"} min-w-24 text-white hover:brightness-95`}>
             {playing ? "■ 정지" : "▶ 재생"}
           </button>
@@ -329,6 +361,19 @@ export function Wizard({
             />
             <span className="w-8 text-right font-mono text-xs text-slate-600 sm:text-sm">{bpm}</span>
           </label>
+
+          <button onClick={onStartBlank} className={btnGhost}>
+            📄 빈 곡에서 시작 (섹션 없이 처음부터)
+          </button>
+
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <span className="text-sm text-slate-500 sm:text-base">샘플 곡 바로 불러오기</span>
+            {GENRES.map((g) => (
+              <button key={g} onClick={() => onLoadDemoSong(g)} className={btnGhost}>
+                {PRESETS[g].label}
+              </button>
+            ))}
+          </div>
 
           <div className="flex justify-between">
             <button onClick={() => setStep(0)} className={btnGhost}>

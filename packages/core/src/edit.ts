@@ -115,6 +115,24 @@ export function appendArrangementItem(song: Song, sectionId: string): Song {
   return capped(song, { ...song, arrangement: [...song.arrangement, sectionId] });
 }
 
+/**
+ * index가 속한, 같은 섹션 id가 연달아 나오는 구간("반복 블록")을 count개로 늘리거나 줄인다.
+ * count는 1 이상이어야 하며, 상한을 넘거나 잘못된 값이면 무시한다.
+ */
+export function setArrangementRepeat(song: Song, index: number, count: number): Song {
+  if (!Number.isInteger(count) || count < 1) return song;
+  const id = song.arrangement[index];
+  if (id === undefined) return song;
+  let start = index;
+  while (start > 0 && song.arrangement[start - 1] === id) start--;
+  let end = index;
+  while (end < song.arrangement.length - 1 && song.arrangement[end + 1] === id) end++;
+  if (end - start + 1 === count) return song;
+  const block = new Array(count).fill(id) as string[];
+  const arrangement = [...song.arrangement.slice(0, start), ...block, ...song.arrangement.slice(end + 1)];
+  return capped(song, { ...song, arrangement });
+}
+
 function nextSectionId(song: Song): string {
   let i = song.sections.length + 1;
   let id = `section${i}`;
@@ -134,6 +152,15 @@ export function addSection(song: Song, name: string): Song {
   const id = nextSectionId(song);
   const section: Section = { ...structuredClone(source), id, name: trimmed };
   return capped(song, { ...song, sections: [...song.sections, section], arrangement: [...song.arrangement, id] });
+}
+
+/** 재생 순서에서 전혀 쓰이지 않는 섹션을 정의 목록에서 지운다. 마지막 하나뿐이거나 재생 순서에 남아 있으면 무시한다. */
+export function removeSection(song: Song, sectionId: string): Song {
+  if (song.sections.length <= 1) return song;
+  if (song.arrangement.includes(sectionId)) return song;
+  const sections = song.sections.filter((s) => s.id !== sectionId);
+  if (sections.length === song.sections.length) return song;
+  return capped(song, { ...song, sections });
 }
 
 // ---- 16스텝 패턴 편집 (드럼·피아노·베이스) ----

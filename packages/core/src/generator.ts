@@ -1,7 +1,7 @@
 // 곡 생성기: 장르·조성·시드를 받아 Song을 만든다. 같은 입력이면 항상 같은 곡(결정적).
 import { getPreset, type Intensity, type SectionTracks } from "./patterns";
 import { degreesToChords, modeOf, templatesFor, type Mode } from "./progressions";
-import { BEATS_PER_BAR, defaultMixer, type ChordSlot, type Genre, type Section, type Song } from "./schema";
+import { BEATS_PER_BAR, STEPS_PER_BAR, defaultMixer, type ChordSlot, type Genre, type Section, type Song } from "./schema";
 
 /** 작은 시드 난수 생성기 (mulberry32). 0 이상 1 미만. */
 export function mulberry32(seed: number): () => number {
@@ -110,6 +110,45 @@ export function generateSong(options: GenerateOptions): Song {
     },
     sections,
     arrangement: options.arrangement ?? ["Intro", "A", "PreChorus", "B", "Outro"],
+    mixer: defaultMixer(),
+  };
+}
+
+export interface BlankSongOptions {
+  genre: Genre;
+  key?: string;
+  bpm?: number;
+}
+
+/** 아무것도 채워지지 않은 무음 섹션 1개로 시작하는 빈 곡. 사용자가 직접 코드·섹션을 쌓아 가는 용도. */
+export function createBlankSong(options: BlankSongOptions): Song {
+  const preset = getPreset(options.genre);
+  const key = options.key ?? "C";
+  const bpm = options.bpm ?? Math.round((preset.bpm[0] + preset.bpm[1]) / 2);
+  const silentPattern = () => ({ main: new Array(STEPS_PER_BAR).fill(0) as number[], muted: true });
+  const section: Section = {
+    id: "section1",
+    name: "섹션 1",
+    bars: 1,
+    chords: [{ symbol: key, beats: BEATS_PER_BAR }],
+    tracks: {
+      piano: { style: "chord", pattern: silentPattern() },
+      bass: { pattern: silentPattern(), approach: false },
+      drums: { lanes: {} },
+    },
+  };
+  return {
+    version: 1,
+    meta: {
+      title: "빈 곡",
+      key,
+      bpm,
+      genre: options.genre,
+      swing: preset.swing,
+      humanizeMs: preset.humanizeMs,
+    },
+    sections: [section],
+    arrangement: [section.id],
     mixer: defaultMixer(),
   };
 }

@@ -5,6 +5,7 @@ import {
   LONG_LINK_CHARS,
   PRESETS,
   TRACK_IDS,
+  createBlankSong,
   defaultMixer,
   generateSong,
   hasShareHash,
@@ -58,6 +59,8 @@ export function App() {
   const [playing, setPlaying] = useState(false);
   const [loop, setLoop] = useState(true);
   const [humanize, setHumanize] = useState(true);
+  const [metronome, setMetronome] = useState(false);
+  const [metronomeVolume, setMetronomeVolume] = useState(-12);
   const [playhead, setPlayhead] = useState<Playhead | null>(null);
   const [samplesReady, setSamplesReady] = useState(false);
   // 되돌리기 한 단계: 직전 편집 전의 구조(섹션·재생 순서). BPM·믹서는 되돌리지 않는다
@@ -106,6 +109,14 @@ export function App() {
   useEffect(() => {
     engineRef.current?.setLoop(loop);
   }, [loop]);
+
+  useEffect(() => {
+    engineRef.current?.setMetronome(metronome);
+  }, [metronome]);
+
+  useEffect(() => {
+    engineRef.current?.setMetronomeVolume(metronomeVolume);
+  }, [metronomeVolume]);
 
   // 자동저장 (슬라이더를 끄는 동안 매번 쓰지 않도록 잠깐 모았다가)
   useEffect(() => {
@@ -160,6 +171,13 @@ export function App() {
     setUndo(null);
   };
 
+  /** 아무것도 없는 무음 섹션 1개로 완전히 새로 시작한다. 편집한 내용이 있으면 먼저 묻는다 */
+  const startBlank = () => {
+    if (edited && !window.confirm("직접 고친 코드·패턴이 사라집니다. 빈 곡에서 새로 시작할까요?")) return;
+    setSong(createBlankSong({ genre, key, bpm }));
+    setUndo(null);
+  };
+
   const patchMeta = (patch: Partial<Song["meta"]>) => setSong((s) => ({ ...s, meta: { ...s.meta, ...patch } }));
 
   const updateChannel = (id: TrackId, patch: Partial<MixerChannel>) =>
@@ -186,6 +204,24 @@ export function App() {
       return;
     }
     if (edited && !window.confirm("직접 고친 코드·패턴이 사라집니다. 이 파일로 바꿀까요?")) return;
+    setFileError(null);
+    setSong(result.song);
+    setUndo(null);
+  };
+
+  /** 미리 만들어 둔 장르별 샘플 곡을 앱 안에서 바로 불러온다. 편집한 내용이 있으면 먼저 묻는다 */
+  const loadDemoSong = async (g: Genre) => {
+    const res = await fetch(`${import.meta.env.BASE_URL}demo-songs/sample-${g}.json`);
+    if (!res.ok) {
+      setFileError(`샘플 곡을 불러올 수 없습니다: ${res.status}`);
+      return;
+    }
+    const result = parseSongJson(await res.text());
+    if (!result.ok) {
+      setFileError(`샘플 곡을 불러올 수 없습니다: ${result.error}`);
+      return;
+    }
+    if (edited && !window.confirm("직접 고친 코드·패턴이 사라집니다. 샘플 곡으로 바꿀까요?")) return;
     setFileError(null);
     setSong(result.song);
     setUndo(null);
@@ -311,6 +347,26 @@ export function App() {
                   한 번만
                 </button>
               </div>
+              <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-1 text-xs" role="group" aria-label="메트로놈">
+                <button
+                  onClick={() => setMetronome((v) => !v)}
+                  aria-pressed={metronome}
+                  className={`rounded-md px-2.5 py-1 font-medium ${metronome ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-white hover:text-slate-900"}`}
+                >
+                  🔔 메트로놈
+                </button>
+                {metronome && (
+                  <input
+                    type="range"
+                    min={-40}
+                    max={0}
+                    value={metronomeVolume}
+                    onChange={(e) => setMetronomeVolume(Number(e.target.value))}
+                    aria-label="메트로놈 볼륨"
+                    className="w-20 accent-indigo-600"
+                  />
+                )}
+              </div>
               <button onClick={toggle} className={`${btn} text-white ${playing ? "bg-rose-500 hover:bg-rose-400" : "bg-emerald-500 hover:bg-emerald-400"} min-w-24`}>
                 {playing ? "■ 정지" : "▶ 재생"}
               </button>
@@ -330,8 +386,14 @@ export function App() {
           onToggle={() => void toggle()}
           loop={loop}
           onSetLoop={setLoop}
+          metronome={metronome}
+          onSetMetronome={setMetronome}
+          metronomeVolume={metronomeVolume}
+          onSetMetronomeVolume={setMetronomeVolume}
           onSectionFocus={setPlayScopeId}
           onRegenerate={regenerate}
+          onStartBlank={startBlank}
+          onLoadDemoSong={loadDemoSong}
           onPatchMeta={patchMeta}
           onChange={applyEdit}
           onUpdateChannel={updateChannel}
@@ -409,9 +471,21 @@ export function App() {
               <button onClick={() => regenerate({ genre, seed: nextSeed })} className={`${btn} bg-indigo-600 text-white hover:bg-indigo-500`}>
                 ✨ 다른 곡 만들기
               </button>
+              <button onClick={startBlank} className={btnGhost}>
+                📄 빈 곡에서 시작
+              </button>
               <button onClick={exportMidi} className={btnGhost}>
                 MIDI 내보내기
               </button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-slate-500">샘플 곡</span>
+              {GENRES.map((g) => (
+                <button key={g} onClick={() => void loadDemoSong(g)} className={btnGhost}>
+                  {PRESETS[g].label}
+                </button>
+              ))}
             </div>
 
             <div className="flex flex-wrap gap-2">

@@ -2,7 +2,7 @@
 // 브라우저 전용(오디오 컨텍스트 필요). 사용자 클릭 뒤에 play()를 불러야 소리가 난다.
 import * as Tone from "tone";
 import { songToEvents } from "./events";
-import { TRACK_IDS, type Song, type TrackId } from "./schema";
+import { BEATS_PER_BAR, TRACK_IDS, type Song, type TrackId } from "./schema";
 import { createInstruments } from "./samplers";
 export { STRINGS_VOICES, type StringsVoiceId } from "./samplers";
 import type { TrackInstrument } from "./synths";
@@ -23,6 +23,10 @@ export interface Engine {
   /** false면 타이밍/세기 흔들림을 끈다 (스윙은 유지) */
   setHumanize(on: boolean): void;
   setLoop(loop: boolean): void;
+  /** 재생 중 메트로놈 클릭음을 같이 들려줄지 (곡 데이터에는 저장되지 않는 로컬 재생 설정) */
+  setMetronome(on: boolean): void;
+  /** 메트로놈 음량 (dB) */
+  setMetronomeVolume(db: number): void;
   setMixer(mixer: Song["mixer"]): void;
   /** 스트링 음색 바꾸기 (다음 음부터 적용) */
   setStringsVoice(id: string): void;
@@ -54,6 +58,12 @@ export function createEngine(options: EngineOptions = {}): Engine {
   const limiter = new Tone.Limiter(-1).toDestination();
   const master = new Tone.Gain(Tone.dbToGain(MASTER_BOOST_DB)).connect(limiter);
   const reverb = new Tone.Reverb({ decay: 2.2, wet: 1 }).connect(master);
+  // 메트로놈은 리버브·마스터 부스트를 거치지 않고 리미터로 바로 간다 (곡 음량과 독립적으로 들리게)
+  const metronomeGain = new Tone.Gain(Tone.dbToGain(-12)).connect(limiter);
+  const metronomeSynth = new Tone.Synth({
+    oscillator: { type: "square" },
+    envelope: { attack: 0.001, decay: 0.04, sustain: 0, release: 0.02 },
+  }).connect(metronomeGain);
   const channels = {} as Record<TrackId, Tone.Channel>;
   const sends: Tone.Gain[] = [];
   for (const id of TRACK_IDS) {
@@ -71,6 +81,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
   let song: Song | undefined;
   let humanize = true;
   let loop = true;
+  let metronomeOn = false;
   let playing = false;
 
   const ticks = (beats: number): string => `${Math.round(beats * ppq)}i`;
@@ -95,6 +106,14 @@ export function createEngine(options: EngineOptions = {}): Engine {
         playing = false;
         options.onEnded?.();
       }, ticks(totalBeats));
+    }
+    if (metronomeOn) {
+      // 매 박(4분음표)마다 클릭. 마디 첫 박(절대 박수가 BEATS_PER_BAR의 배수)만 높은 음으로 악센트.
+      transport.scheduleRepeat((time) => {
+        const beatIndex = Math.round(transport.getTicksAtTime(time) / ppq);
+        const accent = beatIndex % BEATS_PER_BAR === 0;
+        metronomeSynth.triggerAttackRelease(accent ? "C6" : "G5", 0.03, time);
+      }, "4n", 0);
     }
   }
 
@@ -121,6 +140,13 @@ export function createEngine(options: EngineOptions = {}): Engine {
     setLoop(on) {
       loop = on;
       schedule();
+    },
+    setMetronome(on) {
+      metronomeOn = on;
+      schedule();
+    },
+    setMetronomeVolume(db) {
+      metronomeGain.gain.value = Tone.dbToGain(db);
     },
     setMixer: applyMixer,
     setStringsVoice: (id) => instruments.strings.setVoice?.(id),
@@ -152,6 +178,8 @@ export function createEngine(options: EngineOptions = {}): Engine {
       reverb.dispose();
       master.dispose();
       limiter.dispose();
+      metronomeSynth.dispose();
+      metronomeGain.dispose();
     },
   };
 }
