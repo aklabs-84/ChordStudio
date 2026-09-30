@@ -477,21 +477,25 @@ export function Wizard({
             </p>
           )}
 
-          <div className="space-y-2 rounded-lg border border-indigo-200 bg-indigo-50 p-3 sm:space-y-3 sm:p-4">
-            <p className="text-sm font-semibold text-indigo-700 sm:text-base">🤖 AI에게 이 섹션 질문하기</p>
-            <textarea
-              readOnly
-              value={buildSectionPrompt(song, currentSection)}
-              rows={9}
-              className="w-full resize-none rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-700 sm:p-3 sm:text-sm sm:leading-relaxed"
-            />
-            <button onClick={() => void copyText(buildSectionPrompt(song, currentSection))} className={btnGhost}>
-              📋 맞춤 질문 복사하기
-            </button>
-            <p className="text-xs text-indigo-700/70 sm:text-sm">
-              복사한 질문을 Gemini·ChatGPT에 붙여넣으면, 이 섹션에 어울리는 코드 진행과 리듬 아이디어를 받아볼 수 있어요.
-            </p>
-          </div>
+          <details className="group rounded-lg border border-indigo-200 bg-indigo-50/70 p-3 sm:p-4">
+            <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-indigo-700 before:text-xs before:text-indigo-400 before:content-['▶'] group-open:mb-3 group-open:before:content-['▼'] sm:text-base [&::-webkit-details-marker]:hidden">
+              🤖 AI에게 이 섹션 질문하기
+            </summary>
+            <div className="space-y-2 sm:space-y-3">
+              <textarea
+                readOnly
+                value={buildSectionPrompt(song, currentSection)}
+                rows={9}
+                className="w-full resize-none rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-700 sm:p-3 sm:text-sm sm:leading-relaxed"
+              />
+              <button onClick={() => void copyText(buildSectionPrompt(song, currentSection))} className={btnGhost}>
+                📋 맞춤 질문 복사하기
+              </button>
+              <p className="text-xs text-indigo-700/70 sm:text-sm">
+                복사한 질문을 Gemini·ChatGPT에 붙여넣으면, 이 섹션에 어울리는 코드 진행과 리듬 아이디어를 받아볼 수 있어요.
+              </p>
+            </div>
+          </details>
 
           <details className="group rounded-lg border border-slate-200 bg-white p-3 sm:p-4">
             <summary className={summary}>🎹 코드·패턴 편집 방법</summary>
