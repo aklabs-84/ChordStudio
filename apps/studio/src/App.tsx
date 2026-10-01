@@ -10,6 +10,7 @@ import {
   generateSong,
   hasShareHash,
   locate,
+  midiToSong,
   parseSongJson,
   restoreStructure,
   serializeSong,
@@ -230,6 +231,32 @@ export function App() {
     setFileError(null);
     setSong(result.song);
     setUndo(null);
+  };
+
+  const midiInputRef = useRef<HTMLInputElement>(null);
+  const [midiNote, setMidiNote] = useState<string | null>(null);
+
+  /**
+   * MIDI(.mid) 파일에서 코드 진행을 부분적으로 가져온다. MIDI에는 코드 기호·패턴 구조가 남지 않으므로
+   * 음표 더미에서 코드를 근사 추정하고(정확하지 않을 수 있음), 비트·악기 패턴은 선택한 장르의 기본값을 쓴다.
+   */
+  const importMidi = async (file: File | undefined) => {
+    if (!file) return;
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const result = midiToSong(bytes, { genre, title: file.name.replace(/\.mid[i]?$/i, "") });
+    if (!result.ok) {
+      setFileError(`MIDI 파일을 열 수 없습니다: ${result.error}`);
+      setMidiNote(null);
+      return;
+    }
+    if (edited && !window.confirm("직접 고친 코드·패턴이 사라집니다. 이 MIDI로 바꿀까요?")) return;
+    setFileError(null);
+    setSong(result.song);
+    setUndo(null);
+    setMidiNote(
+      `MIDI에서 코드 진행을 가져왔습니다(추정치, 정확하지 않을 수 있어요). 비트·악기 패턴은 "${PRESETS[genre].label}" 기본값입니다.` +
+        (result.warning ? ` ${result.warning}` : ""),
+    );
   };
 
   /** 미리 만들어 둔 장르별 샘플 곡을 앱 안에서 바로 불러온다. 편집한 내용이 있으면 먼저 묻는다 */
@@ -550,6 +577,13 @@ export function App() {
               <button onClick={() => fileInputRef.current?.click()} className={btnGhost}>
                 곡 불러오기
               </button>
+              <button
+                onClick={() => midiInputRef.current?.click()}
+                title="MIDI 파일에서 코드 진행만 근사 추정해 가져옵니다 (비트·악기 패턴은 제외)"
+                className={btnGhost}
+              >
+                MIDI에서 코드 가져오기
+              </button>
               <button onClick={() => void copyLink()} className={btnGhost}>
                 🔗 링크 복사
               </button>
@@ -564,10 +598,26 @@ export function App() {
                   e.target.value = ""; // 같은 파일을 다시 골라도 동작하도록
                 }}
               />
+              <input
+                ref={midiInputRef}
+                type="file"
+                accept="audio/midi,audio/x-midi,.mid,.midi"
+                hidden
+                aria-label="MIDI 파일 선택"
+                onChange={(e) => {
+                  void importMidi(e.target.files?.[0]);
+                  e.target.value = "";
+                }}
+              />
             </div>
             {linkNote && (
               <p role="status" className="text-sm text-slate-500">
                 {linkNote}
+              </p>
+            )}
+            {midiNote && (
+              <p role="status" className="text-sm text-amber-700">
+                {midiNote}
               </p>
             )}
             {fileError && (
