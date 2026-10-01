@@ -26,6 +26,23 @@ import {
   type Song,
 } from "@chord-studio/core";
 
+// 솔로 기능용: PatternRef ↔ 문자열 키 변환 (상태 저장·비교에 사용)
+function refKey(ref: PatternRef): string {
+  return ref.track === "drums" ? `drums:${ref.lane}` : ref.track;
+}
+function keyToRef(key: string): PatternRef | null {
+  if (key === "piano") return { track: "piano" };
+  if (key === "bass") return { track: "bass" };
+  if (key.startsWith("drums:")) return { track: "drums", lane: key.slice(6) as DrumLane };
+  return null;
+}
+interface SoloState {
+  sectionId: string;
+  key: string;
+  /** 솔로 걸기 전 각 줄의 음소거 상태(해제·전환 시 복원용) */
+  prev: [string, boolean][];
+}
+
 interface Props {
   song: Song;
   /** 같은 설정으로 새로 만든 곡 — 섹션 "원래대로"의 기준 */
@@ -130,7 +147,7 @@ const Cell = memo(function Cell({ label, step, subStep, level, active, onStep }:
 function BeatHeader({ activeStep }: { activeStep: number | null }) {
   return (
     <div className="flex items-center gap-2 pb-1.5 text-xs select-none">
-      <div className="w-16 shrink-0 text-right pr-2 font-semibold text-slate-400 text-[11px]">
+      <div className="w-20 shrink-0 text-right pr-2 font-semibold text-slate-400 text-[11px]">
         박자
       </div>
       <div className="grid min-w-0 flex-1 grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2">
@@ -172,16 +189,24 @@ function Row({
   values,
   active,
   muted,
+  soloed,
+  dimmed,
   onStep,
   onToggle,
+  onSolo,
 }: {
   label: string;
   values: number[];
   active: number | null;
   /** 이 섹션에서 꺼져 있는지 */
   muted: boolean;
+  /** 지금 이 줄만 솔로로 듣고 있는지 */
+  soloed: boolean;
+  /** 다른 줄이 솔로 중이라 이 줄은 안 들리는지 */
+  dimmed: boolean;
   onStep: (step: number) => void;
   onToggle: () => void;
+  onSolo: () => void;
 }) {
   // onStep은 렌더마다 새로 만들어지므로 최신 것을 ref로 들고, 칸에는 늘 같은 함수를 넘긴다
   const latest = useRef(onStep);
@@ -189,18 +214,35 @@ function Row({
   const press = useCallback((step: number) => latest.current(step), []);
   return (
     <div className="flex items-center gap-2">
-      <button
-        onClick={onToggle}
-        aria-pressed={!muted}
-        aria-label={`${label} ${muted ? "켜기" : "끄기"} (이 섹션)`}
-        title={muted ? "이 섹션에서 꺼져 있습니다. 누르면 켭니다" : "누르면 이 섹션에서 끕니다 (칸 값은 보존)"}
-        className={`w-16 shrink-0 rounded px-1 py-0.5 text-left text-xs ${
-          muted ? "text-slate-400 line-through hover:bg-slate-100" : "text-slate-600 hover:bg-slate-100"
+      <div className="flex w-20 shrink-0 items-center gap-0.5">
+        <button
+          onClick={onToggle}
+          aria-pressed={!muted}
+          aria-label={`${label} ${muted ? "켜기" : "끄기"} (이 섹션)`}
+          title={muted ? "이 섹션에서 꺼져 있습니다. 누르면 켭니다" : "누르면 이 섹션에서 끕니다 (칸 값은 보존)"}
+          className={`min-w-0 flex-1 rounded px-1 py-0.5 text-left text-xs ${
+            muted ? "text-slate-400 line-through hover:bg-slate-100" : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          {muted ? "🔇" : "🔊"} {label}
+        </button>
+        <button
+          onClick={onSolo}
+          aria-pressed={soloed}
+          aria-label={`${label} 솔로 ${soloed ? "해제" : "켜기"} (이 섹션에서 이 줄만 듣기)`}
+          title={soloed ? "눌러서 솔로 해제 (원래 음소거 상태로 복원)" : "눌러서 이 줄만 듣기 (나머지는 자동으로 음소거)"}
+          className={`h-5 w-5 shrink-0 rounded text-[10px] font-bold leading-none ${
+            soloed ? "bg-amber-400 text-slate-900" : "border border-slate-200 text-slate-400 hover:bg-slate-100"
+          }`}
+        >
+          S
+        </button>
+      </div>
+      <div
+        className={`grid min-w-0 flex-1 grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2 ${
+          muted || dimmed ? "opacity-30" : ""
         }`}
       >
-        {muted ? "🔇" : "🔊"} {label}
-      </button>
-      <div className={`grid min-w-0 flex-1 grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2 ${muted ? "opacity-30" : ""}`}>
         {[0, 1, 2, 3].map((b) => (
           <div key={b} className="grid grid-cols-4 gap-0.5">
             {[0, 1, 2, 3].map((subStep) => {
@@ -300,6 +342,60 @@ export function PatternGrid({ song, original, playhead, onChange, forceSectionId
   // 드럼 전체: 소리 나는 레인이 하나라도 있으면 "끄기", 전부 꺼져 있으면 "켜기"
   const drumRefs = DRUM_LANES.map((lane) => ({ track: "drums", lane }) as PatternRef).filter((r) => getStepPattern(section, r));
   const drumsAllMuted = drumRefs.length > 0 && drumRefs.every(isMuted);
+
+  // 솔로: 한 줄만 켜 두고 같은 섹션의 나머지(피아노·베이스·드럼 레인)를 자동으로 음소거한다.
+  // 스트링은 격자(muted 플래그)가 없어 솔로 대상에서 제외.
+  const [solo, setSolo] = useState<SoloState | null>(null);
+  const soloableRefs: PatternRef[] = [{ track: "piano" }, { track: "bass" }, ...drumRefs];
+  const isSoloed = (ref: PatternRef) => solo?.sectionId === section.id && solo.key === refKey(ref);
+  const isDimmedBySolo = (ref: PatternRef) =>
+    solo?.sectionId === section.id && solo.key !== refKey(ref);
+
+  const restoreSolo = (s: Song, state: SoloState) =>
+    state.prev.reduce((acc, [key, wasMuted]) => {
+      const r = keyToRef(key);
+      return r ? setPatternMuted(acc, state.sectionId, r, wasMuted) : acc;
+    }, s);
+
+  // 섹션을 바꿔서 벗어나면 솔로를 풀어 원래 음소거 상태로 되돌린다 (다른 섹션에 음소거가 남지 않게)
+  useEffect(() => {
+    if (solo && solo.sectionId !== section.id) {
+      const prior = solo;
+      onChange((s) => restoreSolo(s, prior));
+      setSolo(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section.id]);
+
+  // 화면을 아예 떠날 때(다른 탭으로 전환 등)도 솔로를 풀어 음소거가 영구히 남지 않게 한다
+  const soloRef = useRef(solo);
+  soloRef.current = solo;
+  useEffect(
+    () => () => {
+      const prior = soloRef.current;
+      if (prior) onChange((s) => restoreSolo(s, prior));
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  const toggleSolo = (ref: PatternRef) => () => {
+    const key = refKey(ref);
+    if (solo?.sectionId === section.id && solo.key === key) {
+      const prior = solo;
+      onChange((s) => restoreSolo(s, prior));
+      setSolo(null);
+      return;
+    }
+    const prev: [string, boolean][] =
+      solo?.sectionId === section.id
+        ? solo.prev // 같은 섹션에서 다른 줄로 전환 — 솔로 걸기 전 원래 스냅샷을 그대로 유지
+        : soloableRefs.map((r) => [refKey(r), isMuted(r)]);
+    onChange((s) =>
+      soloableRefs.reduce((acc, r) => setPatternMuted(acc, section.id, r, refKey(r) !== key), s),
+    );
+    setSolo({ sectionId: section.id, key, prev });
+  };
 
   // 첫/마지막 마디 패턴이 하나라도 따로 있는지(없으면 "일반 마디와 같음")
   const refs: PatternRef[] = [
@@ -475,6 +571,11 @@ export function PatternGrid({ song, original, playhead, onChange, forceSectionId
           <details className="group space-y-1">
           <summary className={summary}>🥁 비트 (드럼)</summary>
           {renderScopeNav()}
+          {solo?.sectionId === section.id && (
+            <p className="mb-2 rounded-md bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
+              🎧 솔로 중: {solo.key === "piano" ? "피아노" : solo.key === "bass" ? "베이스" : LANE_LABEL[solo.key.slice(6) as DrumLane]} — S를 다시 누르면 해제
+            </p>
+          )}
           <div className="mb-2 flex items-center justify-between gap-2">
             <button
               onClick={() => onChange((s) => setDrumsMuted(s, section.id, !drumsAllMuted))}
@@ -495,8 +596,11 @@ export function PatternGrid({ song, original, playhead, onChange, forceSectionId
                 values={stepsFor(ref)}
                 active={activeStep}
                 muted={isMuted(ref)}
+                soloed={isSoloed(ref)}
+                dimmed={isDimmedBySolo(ref)}
                 onStep={cycle(ref)}
                 onToggle={toggle(ref)}
+                onSolo={toggleSolo(ref)}
               />
             );
           })}
@@ -507,6 +611,11 @@ export function PatternGrid({ song, original, playhead, onChange, forceSectionId
           <details className="group space-y-4">
           <summary className={summary}>🎹 악기 (피아노·베이스·스트링)</summary>
           {renderScopeNav()}
+          {solo?.sectionId === section.id && (
+            <p className="-mt-2 mb-2 rounded-md bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
+              🎧 솔로 중: {solo.key === "piano" ? "피아노" : solo.key === "bass" ? "베이스" : LANE_LABEL[solo.key.slice(6) as DrumLane]} — S를 다시 누르면 해제
+            </p>
+          )}
           <BeatHeader activeStep={activeStep} />
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
@@ -530,8 +639,11 @@ export function PatternGrid({ song, original, playhead, onChange, forceSectionId
               values={stepsFor({ track: "piano" })}
               active={activeStep}
               muted={isMuted({ track: "piano" })}
+              soloed={isSoloed({ track: "piano" })}
+              dimmed={isDimmedBySolo({ track: "piano" })}
               onStep={cycle({ track: "piano" })}
               onToggle={toggle({ track: "piano" })}
+              onSolo={toggleSolo({ track: "piano" })}
             />
           </div>
 
@@ -555,8 +667,11 @@ export function PatternGrid({ song, original, playhead, onChange, forceSectionId
               values={stepsFor({ track: "bass" })}
               active={activeStep}
               muted={isMuted({ track: "bass" })}
+              soloed={isSoloed({ track: "bass" })}
+              dimmed={isDimmedBySolo({ track: "bass" })}
               onStep={cycle({ track: "bass" })}
               onToggle={toggle({ track: "bass" })}
+              onSolo={toggleSolo({ track: "bass" })}
             />
           </div>
 
@@ -575,7 +690,8 @@ export function PatternGrid({ song, original, playhead, onChange, forceSectionId
             칸을 누를 때마다 꺼짐 → 보통 → 세게 → 꺼짐. 1마디는 4박자(1~4박)로 구성되며 각 박자는 4칸으로 세분화(정박·반의반·반박·반의반)되어 있습니다.
             격자는 "언제 치는지"이고, 피아노 스타일(코드/아르페지오/브로큰)은 "치는 칸에서 어떤 음을 내는지"라서
             스타일을 바꿔도 격자는 그대로입니다. 줄 이름(🔊)을 누르면 그 섹션에서만 악기를
-            끄고 켤 수 있고, 꺼도 칸 값은 남아 있습니다.
+            끄고 켤 수 있고, 꺼도 칸 값은 남아 있습니다. 옆의 S 버튼을 누르면 그 줄만 솔로로
+            들을 수 있고(나머지는 자동 음소거), 다시 누르면 원래 음소거 상태로 돌아갑니다.
           </p>
           </details>
         </section>

@@ -364,6 +364,11 @@ export function App() {
               <span className="text-xs text-slate-500" role="status">
                 {samplesReady ? "샘플 준비됨" : "샘플 로딩 중… (그 전에는 신스로 재생)"}
               </span>
+              {playScopeId && (
+                <span className="rounded-md bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800" role="status">
+                  🔂 {song.sections.find((s) => s.id === playScopeId)?.name ?? ""}만 반복 중
+                </span>
+              )}
               <div className="flex gap-1 rounded-lg bg-slate-100 p-1" role="group" aria-label="재생 방식">
                 <button
                   onClick={() => setLoop(true)}
@@ -689,7 +694,14 @@ export function App() {
 
             <ArrangementEditor song={song} activeIndex={activeArrangementIndex} onChange={applyEdit} />
 
-            <ChordEditor song={song} active={activeChord} onChange={applyEdit} onPreviewChord={previewChord} />
+            <ChordEditor
+              song={song}
+              active={activeChord}
+              onChange={applyEdit}
+              onPreviewChord={previewChord}
+              focusedSectionId={playScopeId}
+              onToggleFocus={(id) => setPlayScopeId((cur) => (cur === id ? null : id))}
+            />
           </section>
 
           <PatternGrid song={song} original={original} playhead={playhead} onChange={applyEdit} />

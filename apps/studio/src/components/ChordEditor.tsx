@@ -11,6 +11,10 @@ interface Props {
   onlySectionId?: string;
   /** 코드 버튼을 클릭했을 때 화음을 짧게 미리듣기 */
   onPreviewChord?: (symbol: string) => void;
+  /** 지금 재생을 이 섹션 하나로 좁혀서 반복하고 있다면 그 섹션 id (만들기 화면 전용) */
+  focusedSectionId?: string | null;
+  /** "이 섹션만" 버튼 클릭: 같은 섹션이면 해제, 다르면 그 섹션으로 전환 */
+  onToggleFocus?: (sectionId: string) => void;
 }
 
 interface Selected {
@@ -21,7 +25,15 @@ interface Selected {
 const small =
   "rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white";
 
-export const ChordEditor = memo(function ChordEditor({ song, active: playing, onChange, onlySectionId, onPreviewChord }: Props) {
+export const ChordEditor = memo(function ChordEditor({
+  song,
+  active: playing,
+  onChange,
+  onlySectionId,
+  onPreviewChord,
+  focusedSectionId,
+  onToggleFocus,
+}: Props) {
   const [sel, setSel] = useState<Selected | null>(null);
   const [draft, setDraft] = useState("");
   // Esc로 닫을 때는 blur가 commit을 부르므로 이번 한 번은 저장하지 않도록 표시한다
@@ -58,8 +70,28 @@ export const ChordEditor = memo(function ChordEditor({ song, active: playing, on
     <div className="space-y-4">
       {ordered.map((s) => (
         <div key={s.id}>
-          <p className="mb-1 text-xs text-slate-500">
-            {s.name} ({s.bars}마디){song.arrangement.includes(s.id) ? "" : " · 재생 순서에 없음"}
+          <p className="mb-1 flex items-center gap-2 text-xs text-slate-500">
+            <span>
+              {s.name} ({s.bars}마디){song.arrangement.includes(s.id) ? "" : " · 재생 순서에 없음"}
+            </span>
+            {onToggleFocus && (
+              <button
+                onClick={() => onToggleFocus(s.id)}
+                aria-pressed={focusedSectionId === s.id}
+                title={
+                  focusedSectionId === s.id
+                    ? "눌러서 전체 곡 재생으로 돌아가기"
+                    : "눌러서 이 섹션만 반복 재생하기"
+                }
+                className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${
+                  focusedSectionId === s.id
+                    ? "bg-amber-400 text-slate-900"
+                    : "border border-slate-200 text-slate-500 hover:bg-slate-50"
+                }`}
+              >
+                {focusedSectionId === s.id ? "🔂 이 섹션만 반복 중" : "🔂 이 섹션만"}
+              </button>
+            )}
           </p>
           <ul className="flex flex-wrap gap-1.5">
             {s.chords.map((c, i) => {
